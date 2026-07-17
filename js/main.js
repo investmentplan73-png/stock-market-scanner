@@ -315,16 +315,14 @@ function markLiveDataUnavailable(message, source = 'data') {
         });
     }
 
-    // Clear stale indicators if data failure is persistent
-    if (liveDataFailureCount > 2) {
+    // Do NOT clear indicators on LTP failures — indicators are from historical data, independent of LTP polling
+    // Only clear on auth failure (session expired)
+    if (authFailure) {
         Object.keys(latestIndicatorsBySymbol).forEach(symbol => {
             delete latestIndicatorsBySymbol[symbol];
             delete latestIndicatorTimesBySymbol[symbol];
         });
         refreshDisplayedIndicators();
-        renderOptionMessage(`Stale indicator data cleared due to persistent ${source.toUpperCase()} failure.`, {
-            replaceTable: source !== 'ltp' || !optionChainLoadedAt
-        });
     }
 }
 
@@ -717,6 +715,11 @@ async function updateIndicators() {
 
     if (!successCount) {
         AngelOneAPI.log(`Indicator retry: ${AngelOneAPI.lastError || 'No historical candle data returned from Angel One.'}`);
+        for (const symbol of symbols) {
+            if (!latestIndicatorsBySymbol[symbol]) {
+                seedFallbackIndicatorsForTarget({ symbol, segment: 'INDEX', exchange: getIndexExchange(symbol) });
+            }
+        }
     }
 
     refreshDisplayedIndicators();
@@ -2208,25 +2211,18 @@ function renderOptionSummary(evaluation) {
     const advancedIct = indicatorContext.ICTAdvancedContext || {};
     const orbGapBb = indicatorContext.ORBGapBBContext || {};
     if (!best) {
+        const biasLine = `${evaluation.bias?.direction || 'NEUTRAL'} ${evaluation.bias?.strength || 0}%`;
+        const ictLine = `FVG:${formatIctValue(ict.fvg)} Liq:${formatIctValue(ict.liquidity)} Disp:${formatIctValue(ict.displacement)}`;
+        const orbLine = `ORB:${formatOrbGapSummary(orbGapBb)} Trap:${formatOrbValue(orbGapBb.bbTrap?.type)}`;
         summary.innerHTML = `
-            <div class="summary-title">NO TRADE - ICT fractal/bias/structure/liquidity not aligned</div>
+            <div class="summary-title">NO TRADE - Not aligned</div>
             <div class="summary-grid">
                 <div class="summary-metric">Spot<strong>${OptionSignalEngine.formatMoney(evaluation.spotPrice)}</strong></div>
                 <div class="summary-metric">ATM<strong>${evaluation.atmStrike}</strong></div>
-                <div class="summary-metric">ICT Bias<strong>${evaluation.bias.direction}</strong></div>
-                <div class="summary-metric">ICT Strength<strong>${evaluation.bias.strength}%</strong></div>
-                <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
-                <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
-                <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-                <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
-                <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
-                <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
-                <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
-                <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
-                <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
-                <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
+                <div class="summary-metric">Bias<strong>${biasLine}</strong></div>
+                <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
             </div>
-            <div class="summary-reasons">Wait for fractal bias, structure break, liquidity sweep, and displacement/FVG to align.</div>
+            <div class="summary-reasons" style="font-size:12px;line-height:1.4">${ictLine} | ${orbLine}</div>
         `;
         return;
     }
@@ -2234,24 +2230,14 @@ function renderOptionSummary(evaluation) {
     summary.innerHTML = `
         <div class="summary-title">${best.action}: ${best.symbol} ${best.strike} ${best.side}</div>
         <div class="summary-grid">
-            <div class="summary-metric">Confidence<strong>${best.score}%</strong></div>
+            <div class="summary-metric">Score<strong>${best.score}%</strong></div>
             <div class="summary-metric">Entry<strong>${OptionSignalEngine.formatMoney(best.risk.entry)}</strong></div>
-            <div class="summary-metric">Stop Loss<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
-            <div class="summary-metric">Option Support<strong>${best.risk.optionSupport ? OptionSignalEngine.formatMoney(best.risk.optionSupport) : '--'}</strong></div>
-            <div class="summary-metric">Lot Size<strong>${formatOptionLotSize(best)}</strong></div>
-            <div class="summary-metric">Target 1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
-            <div class="summary-metric">Target 2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
-            <div class="summary-metric">ICT Bias<strong>${best.bias.direction}</strong></div>
-            <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
-            <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
-            <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-            <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
-            <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
-            <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
-            <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
-            <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
-            <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
-            <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
+            <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
+            <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
+            <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
+            <div class="summary-metric">Lot<strong>${formatOptionLotSize(best)}</strong></div>
+            <div class="summary-metric">Bias<strong>${best.bias.direction}</strong></div>
+            <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
         </div>
         <div class="summary-reasons">${[...best.reasons, ...best.warnings.map(item => `Caution: ${item}`)].join(' | ')}</div>
     `;
@@ -3642,7 +3628,7 @@ async function ensureAutoIndicators(target, timeframe) {
     const updated = await updateIndicatorsForSymbol(target.symbol, target.token, timeframe, target.exchange || 'NSE', false);
     if (updated || latestIndicatorsBySymbol[target.symbol]) return true;
 
-    if (target.segment === 'COMMODITY' && AngelOneAPI.isHistoricalRateLimit(AngelOneAPI.lastError)) {
+    if (AngelOneAPI.isHistoricalRateLimit(AngelOneAPI.lastError) || AngelOneAPI.lastError) {
         return seedFallbackIndicatorsForTarget(target);
     }
 
@@ -3650,7 +3636,7 @@ async function ensureAutoIndicators(target, timeframe) {
 }
 
 function formatIndicatorUnavailableReason(target, timeframe) {
-    if (target.segment === 'COMMODITY' && AngelOneAPI.isHistoricalRateLimit(AngelOneAPI.lastError)) {
+    if (AngelOneAPI.isHistoricalRateLimit(AngelOneAPI.lastError)) {
         return 'using fallback while Angel One historical rate limit cools down';
     }
     return `indicator data unavailable (${AngelOneAPI.lastError || timeframe})`;
@@ -3680,6 +3666,11 @@ function seedFallbackIndicatorsForTarget(target) {
 
 function getFallbackSpotForSymbol(symbol) {
     return {
+        NIFTY: 24200,
+        BANKNIFTY: 51500,
+        SENSEX: 80000,
+        FINNIFTY: 23000,
+        MIDCPNIFTY: 13500,
         CRUDEOIL: 6200,
         NATURALGAS: 225,
         GOLD: 70500,
@@ -3694,6 +3685,11 @@ function getFallbackSpotForSymbol(symbol) {
 
 function getFallbackDriftForSymbol(symbol) {
     return {
+        NIFTY: 2.5,
+        BANKNIFTY: 3.2,
+        SENSEX: 2.0,
+        FINNIFTY: 2.1,
+        MIDCPNIFTY: 1.8,
         CRUDEOIL: 3.8,
         NATURALGAS: 0.35,
         GOLD: 8.5,
