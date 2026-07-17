@@ -2425,9 +2425,27 @@ function getOptionLotSize(source = {}) {
         ?? source.lotsize
         ?? source.option?.lotSize
         ?? source.option?.lotsize
-        ?? 0
+        ?? source.trade?.lotSize
     );
-    return Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 0;
+    if (Number.isFinite(lotSize) && lotSize > 0) return lotSize;
+
+    const symbol = String(
+        source.symbol
+        ?? source.option?.symbol
+        ?? source.tradingSymbol
+        ?? ''
+    ).toUpperCase().replace(/\d{2}(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d{2,4}.*$/i, '').replace(/CE$|PE$/i, '').trim();
+
+    const defaults = {
+        NIFTY: 25, BANKNIFTY: 15, FINNIFTY: 40, MIDCPNIFTY: 50, SENSEX: 15,
+        NIFTY_BANK: 15, NIFTY_FIN: 40, NIFTY_MID: 50
+    };
+
+    if (defaults[symbol]) return defaults[symbol];
+
+    const lookup = Config.optionScanner?.stockLotSizes || {};
+    const matchKey = Object.keys(lookup).find(k => symbol.includes(k));
+    return matchKey ? lookup[matchKey] : 0;
 }
 
 function formatOptionLotSize(source = {}) {
