@@ -338,7 +338,6 @@ const Config = {
             apiKey: this.apiKey,
             apiSecret: this.apiSecret,
             clientId: this.clientId,
-            totpSecret: this.totpSecret,
             publicIp: this.publicIp,
             accessToken: this.accessToken,
             refreshToken: this.refreshToken,

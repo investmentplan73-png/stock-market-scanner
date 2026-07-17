@@ -169,14 +169,15 @@
         <h2>Angel One API</h2>
         <p class="helper-text" style="margin-bottom:12px; color:#6cc; font-size:13px;">Ye sab Angel One SmartAPI dashboard se milta hai: <a href="https://smartapi.angelone.in" target="_blank" style="color:#6cf;">smartapi.angelone.in</a> → Developer → My Apps</p>
         <div class="config-form">
-            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="jaise: aBcDeFgHiJkLmNoPqRsTuVw"></div>
+            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="Developer → My Apps se milega"></div>
             <div class="form-group"><label>Password <span style="color:#f88">*</span></label><input type="password" id="apiSecret" placeholder="Angel One login password"></div>
-            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="jaise: g53589 (Login ke baad dikhta hai)"></div>
+            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="Tumhara Angel One login ID (jaise g53589)"></div>
             <div class="form-group"><label>TOTP <span style="color:#f88">*</span></label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="Google Authenticator ka 6-digit code"></div>
-            <div class="form-group"><label>Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="Apna public IP — whatismyipaddress.com se lo"></div>
+            <div class="form-group"><label>Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="whatismyipaddress.com se apna IP"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
+                <button class="btn" style="background:#555;color:#aaa;font-size:11px;padding:6px 10px;border-radius:6px" onclick="clearSavedData()">Clear Saved</button>
             </div>
         </div>
         <p class="helper-text" id="loginError"></p>

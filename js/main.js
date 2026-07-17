@@ -99,7 +99,7 @@ function loadSavedCredentials() {
         document.getElementById('apiKey').value = config.apiKey || '';
         document.getElementById('apiSecret').value = config.apiSecret || '';
         document.getElementById('clientId').value = config.clientId || '';
-        document.getElementById('totpSecret').value = config.totpSecret || '';
+        document.getElementById('totpSecret').value = '';
         const publicIp = document.getElementById('publicIp');
         if (publicIp) publicIp.value = config.publicIp || '';
     } catch (error) {
@@ -119,6 +119,26 @@ function checkExistingConnection() {
         }
     }
     setStatus('Disconnected', false);
+}
+
+function clearSavedData() {
+    localStorage.removeItem('stockMarketConfig');
+    document.getElementById('apiKey').value = '';
+    document.getElementById('apiSecret').value = '';
+    document.getElementById('clientId').value = '';
+    document.getElementById('totpSecret').value = '';
+    const publicIp = document.getElementById('publicIp');
+    if (publicIp) publicIp.value = '';
+    Config.apiKey = '';
+    Config.apiSecret = '';
+    Config.clientId = '';
+    Config.totpSecret = '';
+    Config.publicIp = '';
+    Config.accessToken = '';
+    Config.refreshToken = '';
+    Config.feedToken = '';
+    const loginError = document.getElementById('loginError');
+    if (loginError) loginError.textContent = 'Sab data clear ho gaya. Ab sahi credentials dalo.';
 }
 
 async function detectServerPublicIp() {
@@ -151,6 +171,13 @@ async function connectAPI() {
         if (!apiSecret) missing.push('Password');
         if (!clientId) missing.push('Client ID');
         const msg = `Ye fields khali hain: ${missing.join(', ')}\n\nYe sab tumhe Angel One SmartAPI dashboard se milta hai:\n1. smartapi.angelone.in pe login karo\n2. Developer → My Apps me jao\n3. API Key wahan milega\n4. Client ID tumhara Angel One login ID hai (jaise g53589)\n5. Password tumhara Angel One login password hai`;
+        if (loginError) loginError.textContent = msg;
+        alert(msg);
+        return;
+    }
+
+    if (clientId.toLowerCase() === 'admin' || clientId.toLowerCase() === 'root') {
+        const msg = '"admin" tumhara Angel One Client ID nahi hai!\n\nClient ID = tumhara Angel One account ka login ID.\nJab tum smartapi.angelone.in pe login karte ho to jo ID dikhti hai wo Client ID hai.\nFormat aisa hota hai: g53589';
         if (loginError) loginError.textContent = msg;
         alert(msg);
         return;
