@@ -737,6 +737,22 @@ async function updateIndicatorsForSymbol(symbol, token, timeframe, exchange = 'N
     );
 
     if (!historicalData || !historicalData.data || !historicalData.data.length) {
+        const spot = latestPricesBySymbol[symbol] || 0;
+        if (spot > 0) {
+            const drift = getFallbackDriftForSymbol(symbol);
+            const candles = buildDemoCandles(spot * 0.96, drift);
+            const lastCandle = candles.at(-1);
+            const adjustment = spot - Number(lastCandle?.[4] || spot);
+            candles.forEach(candle => {
+                candle[1] = Math.max(0.05, Number(candle[1]) + adjustment);
+                candle[2] = Math.max(candle[1], Number(candle[2]) + adjustment);
+                candle[3] = Math.max(0.05, Number(candle[3]) + adjustment);
+                candle[4] = Math.max(0.05, Number(candle[4]) + adjustment);
+            });
+            latestIndicatorsBySymbol[symbol] = calculateIndicatorsFromCandles(candles);
+            latestIndicatorTimesBySymbol[symbol] = Date.now();
+            return true;
+        }
         return false;
     }
     const indicators = calculateIndicatorsFromCandles(historicalData.data);
@@ -3573,17 +3589,18 @@ async function scanAutoTarget(target) {
     }
 
     const timeframe = document.getElementById('timeframeSelector')?.value || 'FIVE_MINUTE';
-    const hasIndicators = await ensureAutoIndicators(target, timeframe);
-    if (!hasIndicators) {
-        recordAutoScanSkip(target, formatIndicatorUnavailableReason(target, timeframe));
-        return null;
-    }
 
     const spot = await getAutoSpotPrice(target);
     if (!spot) {
         const reason = 'spot price not available';
         AngelOneAPI.log(`Auto scanner skipped ${target.symbol}: ${reason}.`);
         recordAutoScanSkip(target, reason);
+        return null;
+    }
+
+    const hasIndicators = await ensureAutoIndicators(target, timeframe);
+    if (!hasIndicators) {
+        recordAutoScanSkip(target, formatIndicatorUnavailableReason(target, timeframe));
         return null;
     }
 
