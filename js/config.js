@@ -108,27 +108,33 @@ const Config = {
     // Options scanner settings. Keep this practical for live Angel One data:
     // some quote fields such as option volume can be missing.
     optionScanner: {
-        minConfidence: 70,
-        minBuyScore: 76,
-        strongConfidence: 80,
+        minConfidence: 60,
+        minBuyScore: 55,
+        strongConfidence: 68,
         maxOptionRiskPercent: 30,
-        firstTargetRiskReward: 1.8,
-        secondTargetRiskReward: 2.8,
+        firstTargetRiskReward: 2.0,
+        secondTargetRiskReward: 3.0,
         maxSpreadPercent: 7,
         pivotBufferPercent: 0.24,
         supportResistanceBufferPercent: 0.28,
         showBestWatchWhenNoBuy: true,
-        minWatchScore: 62,
-        maxBuyWarnings: 2,
-        maxWatchWarnings: 3,
-        minRewardRiskForBuy: 1.25,
+        minWatchScore: 50,
+        maxBuyWarnings: 5,
+        maxWatchWarnings: 8,
+        maxBuyPenalty: 35,
+        maxWatchPenalty: 50,
+        requireVwapConfirm: false,
+        requireStructureClear: false,
+        requirePivotConfirm: false,
+        minRewardRiskForBuy: 1.0,
+        spreadBufferPercent: 3,
         stopLoss: {
-            confirmations: 2, // FIX: Was 1, now 2 - need 2 touches to confirm SL
-            fallbackRiskPercent: 28, // FIX: Was 24, wider buffer
-            minRiskPercent: 18, // FIX: Was 14, wider minimum
-            optionSupportBufferPercent: 6, // FIX: Was 4, wider buffer
-            supportBufferPercent: 0.12, // FIX: Was 0.08, wider buffer
-            atrBufferMultiplier: 0.18 // FIX: Was 0.12, wider ATR buffer
+            confirmations: 1,
+            fallbackRiskPercent: 25,
+            minRiskPercent: 12,
+            optionSupportBufferPercent: 6,
+            supportBufferPercent: 0.12,
+            atrBufferMultiplier: 0.18
         },
         breakout: {
             enabled: true,
@@ -224,7 +230,7 @@ const Config = {
         delayBetweenSymbolsMs: 800,
         maxStocksPerCycle: 60,
         maxCommoditiesPerCycle: 3,
-        includeWatchSignals: false,
+        includeWatchSignals: true,
         includeCommodityWatchSignals: true,
         useAllFnoStocks: true,
         includeCommodities: true,

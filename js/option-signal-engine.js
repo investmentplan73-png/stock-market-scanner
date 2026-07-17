@@ -896,9 +896,9 @@ const OptionSignalEngine = {
         const buyAllowed = cleanBuySetup
             && !breakoutCheck.fake
             && qualityCheck.ok
-            && vwapConfirmed
-            && structureClear
-            && pivotConfirmed
+            && (!settings.requireVwapConfirm || vwapConfirmed)
+            && (!settings.requireStructureClear || structureClear)
+            && (!settings.requirePivotConfirm || pivotConfirmed)
             && !transcriptFormulaCheck.blocked
             && (greeksCheck.confirmed || settings.greeks?.requireForBuy !== true)
             && (!greeksCheck.risky || settings.greeks?.requireForBuy !== true)
@@ -1002,8 +1002,10 @@ const OptionSignalEngine = {
         }
 
         const totalWarnings = Number((context.warnings || []).length) + warnings.length;
-        const ok = penalty <= 18 && totalWarnings <= Number(settings.maxBuyWarnings ?? 2);
-        const watchOk = penalty <= 34 && totalWarnings <= Number(settings.maxWatchWarnings ?? 3);
+        const maxPenalty = Number(settings.maxBuyPenalty ?? 35);
+        const maxWatchPenalty = Number(settings.maxWatchPenalty ?? 50);
+        const ok = penalty <= maxPenalty && totalWarnings <= Number(settings.maxBuyWarnings ?? 5);
+        const watchOk = penalty <= maxWatchPenalty && totalWarnings <= Number(settings.maxWatchWarnings ?? 8);
 
         return {
             ok,
