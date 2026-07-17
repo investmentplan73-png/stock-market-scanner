@@ -2444,7 +2444,12 @@ function getOptionLotSize(source = {}) {
         ?? source.option?.lotsize
         ?? 0
     );
-    return Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 0;
+    if (Number.isFinite(lotSize) && lotSize > 0) return lotSize;
+    const symbol = source.symbol || source.option?.symbol || source.tradingSymbol || '';
+    const cleanSymbol = String(symbol).replace(/(CE|PE)$/i, '').replace(/\d+[A-Z]*\d+.*$/, '').trim();
+    const lookup = Config.optionScanner.stockLotSizes || {};
+    const matchedKey = Object.keys(lookup).find(key => cleanSymbol.includes(key));
+    return matchedKey ? lookup[matchedKey] : 0;
 }
 
 function formatOptionLotSize(source = {}) {
@@ -4349,19 +4354,22 @@ function buildDemoOptionsChain(symbol, spot) {
         const timeValue = Math.max(18, 140 - Math.abs(i) * 13);
         const trendBoost = latestIndicatorsBySymbol[symbol]?.EMA?.short > latestIndicatorsBySymbol[symbol]?.EMA?.long ? 12 : -8;
 
+        const lotSize = Config.optionScanner.stockLotSizes[symbol] || 1;
         calls[strike] = {
             ltp: Math.max(1, callIntrinsic + timeValue + trendBoost),
             change: i <= 2 ? 7 + trendBoost * 0.2 : -3,
             volume: 5000 - Math.abs(i) * 220,
             bid: Math.max(1, callIntrinsic + timeValue + trendBoost - 1.8),
-            ask: Math.max(1, callIntrinsic + timeValue + trendBoost + 2.2)
+            ask: Math.max(1, callIntrinsic + timeValue + trendBoost + 2.2),
+            lotSize
         };
         puts[strike] = {
             ltp: Math.max(1, putIntrinsic + timeValue - trendBoost),
             change: i >= -2 ? -4 - trendBoost * 0.15 : 5,
             volume: 4700 - Math.abs(i) * 240,
             bid: Math.max(1, putIntrinsic + timeValue - trendBoost - 2.1),
-            ask: Math.max(1, putIntrinsic + timeValue - trendBoost + 2.4)
+            ask: Math.max(1, putIntrinsic + timeValue - trendBoost + 2.4),
+            lotSize
         };
     }
 
