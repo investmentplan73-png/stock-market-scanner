@@ -1,0 +1,1306 @@
+// Technical indicator calculations used by the signal engines.
+const TechnicalIndicators = {
+    isNumber: function(value) {
+        return typeof value === 'number' && Number.isFinite(value);
+    },
+
+    round: function(value, decimals = 2) {
+        if (!this.isNumber(value)) return null;
+        return Number(value.toFixed(decimals));
+    },
+
+    calculateRSI: function(prices, period = 14) {
+        const values = this.calculateRSIValues(prices, period);
+        return values && values.length ? values.at(-1) : null;
+    },
+
+    calculateRSIValues: function(prices, period = 14) {
+        if (!Array.isArray(prices) || prices.length < period + 1) return null;
+
+        const values = new Array(prices.length).fill(null);
+        let gains = 0;
+        let losses = 0;
+
+        for (let i = 1; i <= period; i++) {
+            const change = prices[i] - prices[i - 1];
+            if (change >= 0) gains += change;
+            else losses -= change;
+        }
+
+        let avgGain = gains / period;
+        let avgLoss = losses / period;
+
+        values[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+
+        for (let i = period + 1; i < prices.length; i++) {
+            const change = prices[i] - prices[i - 1];
+            const gain = Math.max(change, 0);
+            const loss = Math.max(-change, 0);
+            avgGain = ((avgGain * (period - 1)) + gain) / period;
+            avgLoss = ((avgLoss * (period - 1)) + loss) / period;
+            values[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+        }
+
+        return values;
+    },
+
+    calculateEMA: function(prices, period) {
+        if (!Array.isArray(prices) || prices.length < period) return null;
+        return this.calculateEMAValues(prices, period).at(-1);
+    },
+
+    calculateEMAValues: function(prices, period) {
+        if (!Array.isArray(prices) || prices.length < period) return [];
+
+        const multiplier = 2 / (period + 1);
+        const values = new Array(period - 1).fill(null);
+        let ema = prices.slice(0, period).reduce((sum, price) => sum + price, 0) / period;
+        values.push(ema);
+
+        for (let i = period; i < prices.length; i++) {
+            ema = ((prices[i] - ema) * multiplier) + ema;
+            values.push(ema);
+        }
+
+        return values;
+    },
+
+    calculateSMA: function(prices, period) {
+        if (!Array.isArray(prices) || prices.length < period) return null;
+        const recent = prices.slice(-period);
+        return recent.reduce((sum, price) => sum + price, 0) / period;
+    },
+
+    calculateVolumeProfile: function(volumes, closes = [], period = 20) {
+        if (!Array.isArray(volumes)) return null;
+
+        const cleanVolumes = volumes
+            .map(volume => Number(volume))
+            .filter(volume => Number.isFinite(volume) && volume >= 0);
+        if (cleanVolumes.length < 2) return null;
+
+        const current = cleanVolumes.at(-1);
+        const previous = cleanVolumes.at(-2);
+        const lookback = cleanVolumes.slice(Math.max(0, cleanVolumes.length - period - 1), -1);
+        if (!lookback.length) return null;
+
+        const average = lookback.reduce((sum, volume) => sum + volume, 0) / lookback.length;
+        const ratio = average > 0 ? current / average : null;
+
+        const cleanCloses = Array.isArray(closes)
+            ? closes.map(price => Number(price)).filter(Number.isFinite)
+            : [];
+        const currentClose = cleanCloses.at(-1);
+        const previousClose = cleanCloses.at(-2);
+        const priceChange = this.isNumber(currentClose) && this.isNumber(previousClose)
+            ? currentClose - previousClose
+            : null;
+
+        let priceDirection = 'FLAT';
+        if (this.isNumber(priceChange) && priceChange > 0) priceDirection = 'UP';
+        else if (this.isNumber(priceChange) && priceChange < 0) priceDirection = 'DOWN';
+
+        return {
+            current,
+            previous,
+            average,
+            ratio,
+            priceChange,
+            priceDirection,
+            volumeDirection: current > previous ? 'RISING' : current < previous ? 'FALLING' : 'FLAT'
+        };
+    },
+
+    calculateOBV: function(closes, volumes, emaFast = 12, emaSlow = 21) {
+        if (!Array.isArray(closes) || !Array.isArray(volumes)) return null;
+
+        const length = Math.min(closes.length, volumes.length);
+        if (length < Math.max(emaSlow, 3)) return null;
+
+        const values = [0];
+        for (let i = 1; i < length; i++) {
+            const close = Number(closes[i]);
+            const previousClose = Number(closes[i - 1]);
+            const volume = Number(volumes[i]);
+            const previousObv = values.at(-1);
+            if (!Number.isFinite(close) || !Number.isFinite(previousClose) || !Number.isFinite(volume)) {
+                values.push(previousObv);
+            } else if (close > previousClose) {
+                values.push(previousObv + volume);
+            } else if (close < previousClose) {
+                values.push(previousObv - volume);
+            } else {
+                values.push(previousObv);
+            }
+        }
+
+        const fastValues = this.calculateEMAValues(values, emaFast);
+        const slowValues = this.calculateEMAValues(values, emaSlow);
+        const current = values.at(-1);
+        const previous = values.at(-2);
+        const fast = fastValues.at(-1);
+        const slow = slowValues.at(-1);
+        const slope = this.isNumber(previous) ? current - previous : 0;
+
+        let direction = 'NEUTRAL';
+        if (this.isNumber(fast) && this.isNumber(slow)) {
+            if (current > fast && fast > slow && slope >= 0) direction = 'BULLISH';
+            else if (current < fast && fast < slow && slope <= 0) direction = 'BEARISH';
+        }
+
+        return { current, previous, emaFast: fast, emaSlow: slow, slope, direction };
+    },
+
+    calculateEngulfingPattern: function(opens, highs, lows, closes) {
+        const length = Math.min(opens?.length || 0, highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 2) return null;
+
+        const previous = {
+            open: Number(opens[length - 2]),
+            high: Number(highs[length - 2]),
+            low: Number(lows[length - 2]),
+            close: Number(closes[length - 2])
+        };
+        const current = {
+            open: Number(opens[length - 1]),
+            high: Number(highs[length - 1]),
+            low: Number(lows[length - 1]),
+            close: Number(closes[length - 1])
+        };
+        if (![previous.open, previous.high, previous.low, previous.close, current.open, current.high, current.low, current.close].every(Number.isFinite)) {
+            return null;
+        }
+
+        const previousBearish = previous.close < previous.open;
+        const previousBullish = previous.close > previous.open;
+        const currentBullish = current.close > current.open;
+        const currentBearish = current.close < current.open;
+        const bodyEngulfs = Math.max(current.open, current.close) >= Math.max(previous.open, previous.close)
+            && Math.min(current.open, current.close) <= Math.min(previous.open, previous.close);
+        const fullRangeEngulfs = current.high >= previous.high && current.low <= previous.low;
+        const strength = fullRangeEngulfs ? 'STRONG' : bodyEngulfs ? 'BODY' : 'NONE';
+
+        if (previousBearish && currentBullish && bodyEngulfs) {
+            return { type: 'BULLISH', strength, support: current.low, resistance: current.high };
+        }
+        if (previousBullish && currentBearish && bodyEngulfs) {
+            return { type: 'BEARISH', strength, support: current.low, resistance: current.high };
+        }
+
+        return { type: 'NONE', strength: 'NONE', support: current.low, resistance: current.high };
+    },
+
+    getCandleStats: function(open, high, low, close) {
+        const safeOpen = Number(open);
+        const safeHigh = Number(high);
+        const safeLow = Number(low);
+        const safeClose = Number(close);
+        if (![safeOpen, safeHigh, safeLow, safeClose].every(Number.isFinite)) return null;
+
+        const range = Math.max(safeHigh - safeLow, 0);
+        const body = Math.abs(safeClose - safeOpen);
+        const upperWick = Math.max(safeHigh - Math.max(safeOpen, safeClose), 0);
+        const lowerWick = Math.max(Math.min(safeOpen, safeClose) - safeLow, 0);
+        const direction = safeClose > safeOpen ? 'BULLISH' : safeClose < safeOpen ? 'BEARISH' : 'NEUTRAL';
+
+        return {
+            open: safeOpen,
+            high: safeHigh,
+            low: safeLow,
+            close: safeClose,
+            range,
+            body,
+            upperWick,
+            lowerWick,
+            bodyRatio: range ? body / range : 0,
+            upperWickRatio: range ? upperWick / range : 0,
+            lowerWickRatio: range ? lowerWick / range : 0,
+            direction
+        };
+    },
+
+    inferShortTrend: function(closes, lookback = 5) {
+        const clean = (closes || []).map(Number).filter(Number.isFinite);
+        if (clean.length < 3) return 'NEUTRAL';
+        const recent = clean.slice(-lookback);
+        const first = recent[0];
+        const last = recent.at(-1);
+        const change = first ? ((last - first) / first) * 100 : 0;
+        if (change > 0.2) return 'UP';
+        if (change < -0.2) return 'DOWN';
+        return 'NEUTRAL';
+    },
+
+    calculateCandlestickPatterns: function(opens, highs, lows, closes) {
+        const length = Math.min(opens?.length || 0, highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 3) return null;
+
+        const rows = [];
+        for (let i = 0; i < length; i++) {
+            const stats = this.getCandleStats(opens[i], highs[i], lows[i], closes[i]);
+            if (stats) rows.push(stats);
+        }
+        if (rows.length < 3) return null;
+
+        const current = rows.at(-1);
+        const previous = rows.at(-2);
+        const third = rows.at(-3);
+        const trend = this.inferShortTrend(rows.map(item => item.close), 6);
+        const averageRange = rows.slice(-12, -1).reduce((sum, item) => sum + item.range, 0) / Math.max(rows.slice(-12, -1).length, 1);
+        const averageBody = rows.slice(-12, -1).reduce((sum, item) => sum + item.body, 0) / Math.max(rows.slice(-12, -1).length, 1);
+        const patterns = [];
+
+        const addPattern = (name, direction, strength, detail = '') => {
+            patterns.push({ name, direction, strength, detail });
+        };
+
+        const isDoji = current.range > 0 && current.bodyRatio <= 0.12;
+        if (isDoji) addPattern('Doji', 'NEUTRAL', 35, 'Indecision candle');
+
+        if (current.lowerWickRatio >= 0.55 && current.bodyRatio <= 0.35 && current.upperWickRatio <= 0.2) {
+            addPattern(trend === 'DOWN' ? 'Hammer' : 'Hanging Man', trend === 'DOWN' ? 'BULLISH' : 'BEARISH', trend === 'DOWN' ? 72 : 58);
+        }
+
+        if (current.upperWickRatio >= 0.55 && current.bodyRatio <= 0.35 && current.lowerWickRatio <= 0.2) {
+            addPattern(trend === 'UP' ? 'Shooting Star' : 'Inverted Hammer', trend === 'UP' ? 'BEARISH' : 'BULLISH', trend === 'UP' ? 72 : 58);
+        }
+
+        const bodyEngulfs = Math.max(current.open, current.close) >= Math.max(previous.open, previous.close)
+            && Math.min(current.open, current.close) <= Math.min(previous.open, previous.close);
+        if (previous.direction === 'BEARISH' && current.direction === 'BULLISH' && bodyEngulfs) {
+            addPattern('Bullish Engulfing', 'BULLISH', current.range > averageRange ? 82 : 74);
+        } else if (previous.direction === 'BULLISH' && current.direction === 'BEARISH' && bodyEngulfs) {
+            addPattern('Bearish Engulfing', 'BEARISH', current.range > averageRange ? 82 : 74);
+        }
+
+        if (
+            third.direction === 'BEARISH'
+            && previous.bodyRatio <= 0.35
+            && current.direction === 'BULLISH'
+            && current.close > ((third.open + third.close) / 2)
+        ) {
+            addPattern('Morning Star', 'BULLISH', 84);
+        }
+
+        if (
+            third.direction === 'BULLISH'
+            && previous.bodyRatio <= 0.35
+            && current.direction === 'BEARISH'
+            && current.close < ((third.open + third.close) / 2)
+        ) {
+            addPattern('Evening Star', 'BEARISH', 84);
+        }
+
+        if (
+            previous.direction === 'BEARISH'
+            && current.direction === 'BULLISH'
+            && current.close > ((previous.open + previous.close) / 2)
+            && current.open < previous.low
+        ) {
+            addPattern('Piercing Line', 'BULLISH', 70);
+        }
+
+        if (
+            previous.direction === 'BULLISH'
+            && current.direction === 'BEARISH'
+            && current.close < ((previous.open + previous.close) / 2)
+            && current.open > previous.high
+        ) {
+            addPattern('Dark Cloud Cover', 'BEARISH', 70);
+        }
+
+        const recentThree = rows.slice(-3);
+        if (
+            recentThree.every(item => item.direction === 'BULLISH' && item.body >= averageBody * 0.75)
+            && recentThree[2].close > recentThree[1].close
+            && recentThree[1].close > recentThree[0].close
+        ) {
+            addPattern('Three White Soldiers', 'BULLISH', 86);
+        }
+
+        if (
+            recentThree.every(item => item.direction === 'BEARISH' && item.body >= averageBody * 0.75)
+            && recentThree[2].close < recentThree[1].close
+            && recentThree[1].close < recentThree[0].close
+        ) {
+            addPattern('Three Black Crows', 'BEARISH', 86);
+        }
+
+        if (
+            current.direction === 'BULLISH'
+            && current.body >= averageBody * 1.4
+            && current.upperWickRatio <= 0.18
+            && current.lowerWickRatio <= 0.18
+        ) {
+            addPattern('Bullish Marubozu', 'BULLISH', 72);
+        }
+
+        if (
+            current.direction === 'BEARISH'
+            && current.body >= averageBody * 1.4
+            && current.upperWickRatio <= 0.18
+            && current.lowerWickRatio <= 0.18
+        ) {
+            addPattern('Bearish Marubozu', 'BEARISH', 72);
+        }
+
+        const bullishScore = patterns
+            .filter(item => item.direction === 'BULLISH')
+            .reduce((max, item) => Math.max(max, item.strength), 0);
+        const bearishScore = patterns
+            .filter(item => item.direction === 'BEARISH')
+            .reduce((max, item) => Math.max(max, item.strength), 0);
+        const direction = bullishScore > bearishScore ? 'BULLISH'
+            : bearishScore > bullishScore ? 'BEARISH'
+                : 'NEUTRAL';
+        const primary = patterns
+            .filter(item => item.direction === direction || direction === 'NEUTRAL')
+            .sort((a, b) => b.strength - a.strength)[0] || null;
+
+        return {
+            direction,
+            strength: Math.max(bullishScore, bearishScore),
+            primary,
+            patterns: patterns.slice(0, 5),
+            trend
+        };
+    },
+
+    calculateFibonacciContext: function(highs, lows, closes, lookback = 55) {
+        const length = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 10) return null;
+
+        const cleanHighs = highs.slice(-lookback).map(Number).filter(Number.isFinite);
+        const cleanLows = lows.slice(-lookback).map(Number).filter(Number.isFinite);
+        const cleanCloses = closes.slice(-lookback).map(Number).filter(Number.isFinite);
+        if (cleanHighs.length < 10 || cleanLows.length < 10 || cleanCloses.length < 10) return null;
+
+        const high = Math.max(...cleanHighs);
+        const low = Math.min(...cleanLows);
+        const close = cleanCloses.at(-1);
+        const range = high - low;
+        if (!this.isNumber(range) || range <= 0 || !this.isNumber(close)) return null;
+
+        const highIndex = cleanHighs.lastIndexOf(high);
+        const lowIndex = cleanLows.lastIndexOf(low);
+        const trend = lowIndex < highIndex ? 'UP' : highIndex < lowIndex ? 'DOWN' : this.inferShortTrend(cleanCloses, 8);
+        const retracementRatios = [0.236, 0.382, 0.5, 0.618, 0.786];
+        const extensionRatios = [1.272, 1.618, 2.0];
+        const retracements = {};
+        const extensions = {};
+
+        retracementRatios.forEach(ratio => {
+            retracements[String(ratio)] = trend === 'UP'
+                ? high - (range * ratio)
+                : low + (range * ratio);
+        });
+        extensionRatios.forEach(ratio => {
+            extensions[String(ratio)] = trend === 'UP'
+                ? low + (range * ratio)
+                : high - (range * ratio);
+        });
+
+        const tolerance = Math.max(close * 0.0025, range * 0.015);
+        const nearest = Object.entries(retracements)
+            .map(([ratio, value]) => ({
+                ratio,
+                value,
+                distance: Math.abs(close - value),
+                distancePercent: close ? (Math.abs(close - value) / close) * 100 : 0
+            }))
+            .sort((a, b) => a.distance - b.distance)[0] || null;
+        const goldenLow = Math.min(retracements['0.5'], retracements['0.618']);
+        const goldenHigh = Math.max(retracements['0.5'], retracements['0.618']);
+        const inGoldenZone = close >= goldenLow - tolerance && close <= goldenHigh + tolerance;
+        const holdingGoldenZone = inGoldenZone && (trend === 'UP' ? close >= goldenLow : close <= goldenHigh);
+        const breakout = trend === 'UP' && close > high ? 'EXTENSION_UP'
+            : trend === 'DOWN' && close < low ? 'EXTENSION_DOWN'
+                : 'NONE';
+        const direction = trend === 'UP' && (holdingGoldenZone || breakout === 'EXTENSION_UP') ? 'BULLISH'
+            : trend === 'DOWN' && (holdingGoldenZone || breakout === 'EXTENSION_DOWN') ? 'BEARISH'
+                : 'NEUTRAL';
+        const strength = Math.min(100,
+            (inGoldenZone ? 36 : nearest && nearest.distance <= tolerance ? 24 : 0)
+            + (breakout !== 'NONE' ? 34 : 0)
+            + (trend !== 'NEUTRAL' ? 18 : 0)
+        );
+
+        return {
+            direction,
+            strength,
+            trend,
+            swingHigh: high,
+            swingLow: low,
+            currentPrice: close,
+            retracements,
+            extensions,
+            nearest,
+            inGoldenZone,
+            holdingGoldenZone,
+            breakout
+        };
+    },
+
+    calculateChartPatterns: function(highs, lows, closes, lookback = 34) {
+        const length = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 12) return null;
+
+        const h = highs.slice(-lookback).map(Number).filter(Number.isFinite);
+        const l = lows.slice(-lookback).map(Number).filter(Number.isFinite);
+        const c = closes.slice(-lookback).map(Number).filter(Number.isFinite);
+        const n = Math.min(h.length, l.length, c.length);
+        if (n < 12) return null;
+
+        const recentHigh = Math.max(...h);
+        const recentLow = Math.min(...l);
+        const close = c.at(-1);
+        const range = recentHigh - recentLow;
+        if (!this.isNumber(range) || range <= 0 || !this.isNumber(close)) return null;
+
+        const tolerance = Math.max(close * 0.003, range * 0.035);
+        const swingHighs = [];
+        const swingLows = [];
+        for (let i = 2; i < n - 2; i++) {
+            if (h[i] >= h[i - 1] && h[i] >= h[i - 2] && h[i] >= h[i + 1] && h[i] >= h[i + 2]) {
+                swingHighs.push({ index: i, value: h[i] });
+            }
+            if (l[i] <= l[i - 1] && l[i] <= l[i - 2] && l[i] <= l[i + 1] && l[i] <= l[i + 2]) {
+                swingLows.push({ index: i, value: l[i] });
+            }
+        }
+
+        const lastHighs = swingHighs.slice(-3);
+        const lastLows = swingLows.slice(-3);
+        const patterns = [];
+        const addPattern = (name, direction, strength, trigger = '') => {
+            patterns.push({ name, direction, strength, trigger });
+        };
+
+        if (lastHighs.length >= 2) {
+            const [a, b] = lastHighs.slice(-2);
+            if (Math.abs(a.value - b.value) <= tolerance && close < Math.min(...l.slice(a.index, n))) {
+                addPattern('Double Top', 'BEARISH', 78, 'Neckline breakdown');
+            }
+        }
+
+        if (lastLows.length >= 2) {
+            const [a, b] = lastLows.slice(-2);
+            if (Math.abs(a.value - b.value) <= tolerance && close > Math.max(...h.slice(a.index, n))) {
+                addPattern('Double Bottom', 'BULLISH', 78, 'Neckline breakout');
+            }
+        }
+
+        if (lastHighs.length >= 3) {
+            const [left, head, right] = lastHighs;
+            const shouldersClose = Math.abs(left.value - right.value) <= tolerance * 1.6;
+            if (head.value > left.value + tolerance && head.value > right.value + tolerance && shouldersClose) {
+                const neckline = Math.min(...lastLows.map(item => item.value));
+                if (close < neckline) addPattern('Head and Shoulders', 'BEARISH', 86, 'Neckline breakdown');
+            }
+        }
+
+        if (lastLows.length >= 3) {
+            const [left, head, right] = lastLows;
+            const shouldersClose = Math.abs(left.value - right.value) <= tolerance * 1.6;
+            if (head.value < left.value - tolerance && head.value < right.value - tolerance && shouldersClose) {
+                const neckline = Math.max(...lastHighs.map(item => item.value));
+                if (close > neckline) addPattern('Inverse Head and Shoulders', 'BULLISH', 86, 'Neckline breakout');
+            }
+        }
+
+        const firstHalfHigh = Math.max(...h.slice(0, Math.floor(n / 2)));
+        const secondHalfHigh = Math.max(...h.slice(Math.floor(n / 2)));
+        const firstHalfLow = Math.min(...l.slice(0, Math.floor(n / 2)));
+        const secondHalfLow = Math.min(...l.slice(Math.floor(n / 2)));
+        const contracting = (secondHalfHigh - secondHalfLow) < (firstHalfHigh - firstHalfLow) * 0.78;
+        if (contracting && close > secondHalfHigh - tolerance) {
+            addPattern('Triangle Breakout', 'BULLISH', 72, 'Range expansion up');
+        } else if (contracting && close < secondHalfLow + tolerance) {
+            addPattern('Triangle Breakdown', 'BEARISH', 72, 'Range expansion down');
+        }
+
+        const channelSlope = (c.at(-1) - c[0]) / Math.max(c[0], 1);
+        const nearHigh = recentHigh - close <= tolerance;
+        const nearLow = close - recentLow <= tolerance;
+        if (channelSlope > 0.015 && nearHigh) addPattern('Ascending Channel Breakout', 'BULLISH', 64);
+        if (channelSlope < -0.015 && nearLow) addPattern('Descending Channel Breakdown', 'BEARISH', 64);
+
+        const bullishScore = patterns
+            .filter(item => item.direction === 'BULLISH')
+            .reduce((max, item) => Math.max(max, item.strength), 0);
+        const bearishScore = patterns
+            .filter(item => item.direction === 'BEARISH')
+            .reduce((max, item) => Math.max(max, item.strength), 0);
+        const direction = bullishScore > bearishScore ? 'BULLISH'
+            : bearishScore > bullishScore ? 'BEARISH'
+                : 'NEUTRAL';
+        const primary = patterns
+            .filter(item => item.direction === direction)
+            .sort((a, b) => b.strength - a.strength)[0] || null;
+
+        return {
+            direction,
+            strength: Math.max(bullishScore, bearishScore),
+            primary,
+            patterns: patterns.slice(0, 5),
+            recentHigh,
+            recentLow,
+            currentPrice: close
+        };
+    },
+
+    calculateMotherVolume: function(opens, highs, lows, closes, volumes, period = 252, averagePeriod = 20, multiplier = 1.8) {
+        const length = Math.min(opens?.length || 0, highs?.length || 0, lows?.length || 0, closes?.length || 0, volumes?.length || 0);
+        if (length < Math.max(averagePeriod + 1, 10)) return null;
+
+        const currentVolume = Number(volumes[length - 1]);
+        const currentOpen = Number(opens[length - 1]);
+        const currentHigh = Number(highs[length - 1]);
+        const currentLow = Number(lows[length - 1]);
+        const currentClose = Number(closes[length - 1]);
+        if (![currentVolume, currentOpen, currentHigh, currentLow, currentClose].every(Number.isFinite)) return null;
+
+        const priorVolumes = volumes
+            .slice(Math.max(0, length - period - 1), length - 1)
+            .map(Number)
+            .filter(Number.isFinite);
+        const averageVolumes = volumes
+            .slice(Math.max(0, length - averagePeriod - 1), length - 1)
+            .map(Number)
+            .filter(Number.isFinite);
+        if (!priorVolumes.length || !averageVolumes.length) return null;
+
+        const priorMax = Math.max(...priorVolumes);
+        const average = averageVolumes.reduce((sum, value) => sum + value, 0) / averageVolumes.length;
+        const ratio = average > 0 ? currentVolume / average : null;
+        const maxRatio = priorMax > 0 ? currentVolume / priorMax : null;
+        const direction = currentClose > currentOpen ? 'BULLISH' : currentClose < currentOpen ? 'BEARISH' : 'NEUTRAL';
+        const closePosition = currentHigh > currentLow ? ((currentClose - currentLow) / (currentHigh - currentLow)) * 100 : 50;
+        const recentHigh = Math.max(...highs.slice(Math.max(0, length - 21), length - 1).map(Number).filter(Number.isFinite));
+        const recentLow = Math.min(...lows.slice(Math.max(0, length - 21), length - 1).map(Number).filter(Number.isFinite));
+        const breakout = Number.isFinite(recentHigh) && currentClose > recentHigh ? 'UP'
+            : Number.isFinite(recentLow) && currentClose < recentLow ? 'DOWN'
+                : 'NONE';
+        const isMother = currentVolume >= priorMax * 0.95 && this.isNumber(ratio) && ratio >= multiplier;
+
+        return {
+            current: currentVolume,
+            average,
+            priorMax,
+            ratio,
+            maxRatio,
+            isMother,
+            direction,
+            closePosition,
+            breakout,
+            high: currentHigh,
+            low: currentLow,
+            close: currentClose
+        };
+    },
+
+    calculateAdvancedRSIContext: function(closes, highs, lows, volumes, options = {}) {
+        const period = options.period || 14;
+        const overbought = options.overbought ?? 70;
+        const oversold = options.oversold ?? 30;
+        const heat = options.heat ?? 80;
+        const warning = options.warning ?? 86;
+        const rsiValues = this.calculateRSIValues(closes, period);
+        if (!rsiValues || !rsiValues.length) return null;
+
+        const current = rsiValues.at(-1);
+        const previous = rsiValues.at(-2);
+        if (!this.isNumber(current)) return null;
+
+        const sma20 = this.calculateSMA(closes, options.confirmationSmaPeriod || 20);
+        const bollinger = this.calculateBollingerBands(closes, options.bbPeriod || 20, options.bbStdDev || 2);
+        const obv = this.calculateOBV(closes, volumes || [], options.obvFast || 12, options.obvSlow || 21);
+        const currentClose = Number(closes.at(-1));
+        const previousClose = Number(closes.at(-2));
+        const bbBlastUp = bollinger && currentClose > bollinger.upper;
+        const bbBlastDown = bollinger && currentClose < bollinger.lower;
+        const priceAboveSma = this.isNumber(sma20) && currentClose > sma20;
+        const priceBelowSma = this.isNumber(sma20) && currentClose < sma20;
+        const obvBullish = obv?.direction === 'BULLISH';
+        const obvBearish = obv?.direction === 'BEARISH';
+
+        const recentRsi = rsiValues.filter(this.isNumber).slice(-(options.freshLookback || 20));
+        const previousRecent = recentRsi.slice(0, -1);
+        const freshAbove70 = current >= overbought && previousRecent.every(value => value < overbought);
+        const freshBelow30 = current <= oversold && previousRecent.every(value => value > oversold);
+        const sustainedAbove70 = recentRsi.slice(-3).filter(value => value >= overbought).length >= 2;
+        const sustainedBelow30 = recentRsi.slice(-3).filter(value => value <= oversold).length >= 2;
+
+        const crossedBackBelow70 = this.isNumber(previous) && previous >= overbought && current < overbought;
+        const crossedBackAbove30 = this.isNumber(previous) && previous <= oversold && current > oversold;
+        const bearishConfirmation = priceBelowSma || bbBlastDown || obvBearish || currentClose < previousClose;
+        const bullishConfirmation = priceAboveSma || bbBlastUp || obvBullish || currentClose > previousClose;
+
+        let zone = 'NEUTRAL';
+        if (current >= warning) zone = 'WARNING_HEAT';
+        else if (current >= heat) zone = 'OVERHEAT';
+        else if (current >= overbought) zone = 'HEAT';
+        else if (current <= oversold) zone = 'WEAK';
+        else if (current < 50) zone = 'BEARISH_SIDE';
+        else if (current > 50) zone = 'BULLISH_SIDE';
+
+        let signal = 'HOLD';
+        let direction = 'NEUTRAL';
+        const reasons = [];
+
+        if (crossedBackBelow70 && bearishConfirmation) {
+            signal = 'SELL';
+            direction = 'BEARISH';
+            reasons.push('RSI came back below 70 with confirmation');
+        } else if (crossedBackAbove30 && bullishConfirmation) {
+            signal = 'BUY';
+            direction = 'BULLISH';
+            reasons.push('RSI came back above 30 with confirmation');
+        } else if (current >= heat && (bbBlastUp || priceAboveSma || obvBullish)) {
+            signal = 'BUY';
+            direction = 'BULLISH';
+            reasons.push('RSI heat zone has momentum confirmation');
+        } else if (current <= oversold && (bbBlastDown || priceBelowSma || obvBearish)) {
+            signal = 'SELL';
+            direction = 'BEARISH';
+            reasons.push('RSI weak zone has downside confirmation');
+        } else if (current >= overbought && (freshAbove70 || sustainedAbove70)) {
+            direction = 'BULLISH';
+            reasons.push('RSI above 70 is treated as strength, not automatic sell');
+        } else if (current <= oversold && (freshBelow30 || sustainedBelow30)) {
+            direction = 'BEARISH';
+            reasons.push('RSI below 30 is treated as weakness, not automatic buy');
+        } else if (current > 50 && bullishConfirmation) {
+            direction = 'BULLISH';
+        } else if (current < 50 && bearishConfirmation) {
+            direction = 'BEARISH';
+        }
+
+        return {
+            value: current,
+            previous,
+            signal,
+            direction,
+            zone,
+            crossedBackBelow70,
+            crossedBackAbove30,
+            freshAbove70,
+            freshBelow30,
+            sustainedAbove70,
+            sustainedBelow30,
+            bbBlastUp,
+            bbBlastDown,
+            priceAboveSma,
+            priceBelowSma,
+            obvDirection: obv?.direction || 'NEUTRAL',
+            reasons
+        };
+    },
+
+    calculateVWAP: function(highs, lows, closes, volumes, period = 50) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes) || !Array.isArray(volumes)) {
+            return null;
+        }
+
+        const length = Math.min(highs.length, lows.length, closes.length, volumes.length);
+        if (length < 2) return null;
+
+        const start = Math.max(0, length - period);
+        let priceVolumeSum = 0;
+        let volumeSum = 0;
+        let fallbackPriceSum = 0;
+        let fallbackCount = 0;
+
+        for (let i = start; i < length; i++) {
+            const high = Number(highs[i]);
+            const low = Number(lows[i]);
+            const close = Number(closes[i]);
+            const volume = Number(volumes[i]);
+            if (!Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
+
+            const typicalPrice = (high + low + close) / 3;
+            fallbackPriceSum += typicalPrice;
+            fallbackCount += 1;
+
+            if (Number.isFinite(volume) && volume > 0) {
+                priceVolumeSum += typicalPrice * volume;
+                volumeSum += volume;
+            }
+        }
+
+        const currentPrice = Number(closes[length - 1]);
+        const vwap = volumeSum > 0
+            ? priceVolumeSum / volumeSum
+            : fallbackCount
+                ? fallbackPriceSum / fallbackCount
+                : null;
+
+        if (!this.isNumber(vwap) || !this.isNumber(currentPrice)) return null;
+
+        return {
+            vwap,
+            currentPrice,
+            distancePercent: ((currentPrice - vwap) / vwap) * 100,
+            position: currentPrice > vwap ? 'ABOVE' : currentPrice < vwap ? 'BELOW' : 'AT',
+            volumeBacked: volumeSum > 0
+        };
+    },
+
+    calculatePivotPoints: function(highs, lows, closes) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes)) return null;
+
+        const cleanHighs = highs.map(price => Number(price)).filter(Number.isFinite);
+        const cleanLows = lows.map(price => Number(price)).filter(Number.isFinite);
+        const cleanCloses = closes.map(price => Number(price)).filter(Number.isFinite);
+        if (cleanHighs.length < 2 || cleanLows.length < 2 || cleanCloses.length < 2) return null;
+
+        const previousHigh = cleanHighs.at(-2);
+        const previousLow = cleanLows.at(-2);
+        const previousClose = cleanCloses.at(-2);
+        const currentPrice = cleanCloses.at(-1);
+        const range = previousHigh - previousLow;
+        if (!this.isNumber(range) || range <= 0) return null;
+
+        const pivot = (previousHigh + previousLow + previousClose) / 3;
+
+        return {
+            pivot,
+            r1: (2 * pivot) - previousLow,
+            s1: (2 * pivot) - previousHigh,
+            r2: pivot + range,
+            s2: pivot - range,
+            r3: previousHigh + (2 * (pivot - previousLow)),
+            s3: previousLow - (2 * (previousHigh - pivot)),
+            currentPrice,
+            previousHigh,
+            previousLow,
+            previousClose,
+            range
+        };
+    },
+
+    calculateSupportResistance: function(highs, lows, closes, opens = [], period = 34, swingLookback = 2) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes)) return null;
+
+        const length = Math.min(highs.length, lows.length, closes.length);
+        if (length < Math.max(8, swingLookback * 2 + 3)) return null;
+
+        const candles = [];
+        for (let i = 0; i < length; i++) {
+            const open = Number(opens[i]);
+            const high = Number(highs[i]);
+            const low = Number(lows[i]);
+            const close = Number(closes[i]);
+            if (Number.isFinite(high) && Number.isFinite(low) && Number.isFinite(close)) {
+                candles.push({
+                    open: Number.isFinite(open) ? open : close,
+                    high,
+                    low,
+                    close,
+                    index: i
+                });
+            }
+        }
+        if (candles.length < Math.max(8, swingLookback * 2 + 3)) return null;
+
+        const latestCandle = candles.at(-1);
+        const previousCandle = candles.at(-2);
+        const currentPrice = latestCandle.close;
+        const previousClose = previousCandle.close;
+        const start = Math.max(0, candles.length - period - 1);
+        const recent = candles.slice(start, -1);
+        if (recent.length < Math.max(6, swingLookback * 2 + 1)) return null;
+
+        const supportCandidates = [];
+        const resistanceCandidates = [];
+        const firstIndex = Math.max(swingLookback, start);
+        const lastIndex = candles.length - 1 - swingLookback;
+
+        for (let i = firstIndex; i < lastIndex; i++) {
+            const candle = candles[i];
+            const neighbors = candles.slice(i - swingLookback, i + swingLookback + 1);
+            const isSwingLow = neighbors.every(item => candle.low <= item.low);
+            const isSwingHigh = neighbors.every(item => candle.high >= item.high);
+
+            if (isSwingLow) supportCandidates.push({ value: candle.low, index: candle.index });
+            if (isSwingHigh) resistanceCandidates.push({ value: candle.high, index: candle.index });
+        }
+
+        const recentLow = Math.min(...recent.map(candle => candle.low));
+        const recentHigh = Math.max(...recent.map(candle => candle.high));
+        supportCandidates.push({ value: recentLow, index: recent.at(-1).index });
+        resistanceCandidates.push({ value: recentHigh, index: recent.at(-1).index });
+
+        const tolerance = Math.max(currentPrice * 0.0015, (recentHigh - recentLow) * 0.05);
+        const supportLevels = this.clusterPriceLevels(supportCandidates, tolerance);
+        const resistanceLevels = this.clusterPriceLevels(resistanceCandidates, tolerance);
+        const supports = supportLevels
+            .filter(level => level.value < currentPrice)
+            .sort((a, b) => b.value - a.value);
+        const resistances = resistanceLevels
+            .filter(level => level.value > currentPrice)
+            .sort((a, b) => a.value - b.value);
+
+        const nearestSupport = supports[0] || null;
+        const nearestResistance = resistances[0] || null;
+        const breakout = this.calculateBreakoutState({
+            currentPrice,
+            previousClose,
+            currentOpen: latestCandle.open,
+            currentHigh: latestCandle.high,
+            currentLow: latestCandle.low,
+            supportLevels,
+            resistanceLevels
+        });
+
+        return {
+            currentPrice,
+            previousClose,
+            currentOpen: latestCandle.open,
+            currentHigh: latestCandle.high,
+            currentLow: latestCandle.low,
+            support: nearestSupport,
+            resistance: nearestResistance,
+            supports: supports.slice(0, 3),
+            resistances: resistances.slice(0, 3),
+            supportLevels: supportLevels.slice(0, 6),
+            resistanceLevels: resistanceLevels.slice(0, 6),
+            supportDistancePercent: nearestSupport ? ((currentPrice - nearestSupport.value) / currentPrice) * 100 : null,
+            resistanceDistancePercent: nearestResistance ? ((nearestResistance.value - currentPrice) / currentPrice) * 100 : null,
+            breakout,
+            lookback: recent.length
+        };
+    },
+
+    calculateBreakoutState: function(context) {
+        const {
+            currentPrice,
+            previousClose,
+            currentOpen,
+            currentHigh,
+            currentLow,
+            supportLevels = [],
+            resistanceLevels = []
+        } = context || {};
+
+        if (!this.isNumber(currentPrice) || !this.isNumber(previousClose)) {
+            return { up: null, down: null, fakeUp: null, fakeDown: null };
+        }
+
+        const settings = (typeof Config !== 'undefined' && Config.optionScanner?.breakout) || {};
+        const minWickBreakPercent = Number(settings.minWickBreakPercent ?? 0.04);
+        const minClosePositionPercent = Number(settings.minClosePositionPercent ?? 62);
+        const maxWeakClosePercent = Number(settings.maxWeakClosePercent ?? 0.18);
+        const minRejectionWickRatio = Number(settings.minRejectionWickRatio ?? 0.42);
+        const safeHigh = this.isNumber(currentHigh) ? currentHigh : currentPrice;
+        const safeLow = this.isNumber(currentLow) ? currentLow : currentPrice;
+        const safeOpen = this.isNumber(currentOpen) ? currentOpen : previousClose;
+        const candleRange = Math.max(safeHigh - safeLow, 0);
+        const upperWick = Math.max(safeHigh - Math.max(safeOpen, currentPrice), 0);
+        const lowerWick = Math.max(Math.min(safeOpen, currentPrice) - safeLow, 0);
+        const upperWickRatio = candleRange ? upperWick / candleRange : 0;
+        const lowerWickRatio = candleRange ? lowerWick / candleRange : 0;
+        const closePositionPercent = candleRange ? ((currentPrice - safeLow) / candleRange) * 100 : 50;
+        const closeFromHighPercent = 100 - closePositionPercent;
+
+        const brokenResistance = resistanceLevels
+            .filter(level => this.isNumber(level.value) && level.value < currentPrice && previousClose <= level.value)
+            .sort((a, b) => b.value - a.value)[0] || null;
+        const brokenSupport = supportLevels
+            .filter(level => this.isNumber(level.value) && level.value > currentPrice && previousClose >= level.value)
+            .sort((a, b) => a.value - b.value)[0] || null;
+
+        const fakeUp = resistanceLevels
+            .map(level => this.buildFakeBreakoutRisk({
+                side: 'UP',
+                level,
+                currentPrice,
+                previousClose,
+                currentHigh: safeHigh,
+                currentLow: safeLow,
+                wickRatio: upperWickRatio,
+                closePositionPercent,
+                minWickBreakPercent,
+                minClosePositionPercent,
+                maxWeakClosePercent,
+                minRejectionWickRatio
+            }))
+            .filter(Boolean)
+            .sort((a, b) => Math.abs(a.value - currentPrice) - Math.abs(b.value - currentPrice))[0] || null;
+        const fakeDown = supportLevels
+            .map(level => this.buildFakeBreakoutRisk({
+                side: 'DOWN',
+                level,
+                currentPrice,
+                previousClose,
+                currentHigh: safeHigh,
+                currentLow: safeLow,
+                wickRatio: lowerWickRatio,
+                closePositionPercent: closeFromHighPercent,
+                minWickBreakPercent,
+                minClosePositionPercent,
+                maxWeakClosePercent,
+                minRejectionWickRatio
+            }))
+            .filter(Boolean)
+            .sort((a, b) => Math.abs(a.value - currentPrice) - Math.abs(b.value - currentPrice))[0] || null;
+
+        return {
+            up: brokenResistance ? {
+                level: brokenResistance,
+                closePercent: ((currentPrice - brokenResistance.value) / brokenResistance.value) * 100,
+                previousClose,
+                currentPrice
+            } : null,
+            down: brokenSupport ? {
+                level: brokenSupport,
+                closePercent: ((brokenSupport.value - currentPrice) / brokenSupport.value) * 100,
+                previousClose,
+                currentPrice
+            } : null,
+            fakeUp: fakeUp ? {
+                level: fakeUp,
+                wickPercent: fakeUp.wickPercent,
+                reason: fakeUp.reason,
+                wickRatio: fakeUp.wickRatio,
+                closePositionPercent: fakeUp.closePositionPercent,
+                previousClose,
+                currentPrice
+            } : null,
+            fakeDown: fakeDown ? {
+                level: fakeDown,
+                wickPercent: fakeDown.wickPercent,
+                reason: fakeDown.reason,
+                wickRatio: fakeDown.wickRatio,
+                closePositionPercent: fakeDown.closePositionPercent,
+                previousClose,
+                currentPrice
+            } : null
+        };
+    },
+
+    buildFakeBreakoutRisk: function(context) {
+        const {
+            side,
+            level,
+            currentPrice,
+            previousClose,
+            currentHigh,
+            currentLow,
+            wickRatio,
+            closePositionPercent,
+            minWickBreakPercent,
+            minClosePositionPercent,
+            maxWeakClosePercent,
+            minRejectionWickRatio
+        } = context || {};
+        if (!level || !this.isNumber(level.value)) return null;
+
+        const levelValue = Number(level.value);
+        const isUp = side === 'UP';
+        const pierced = isUp
+            ? this.isNumber(currentHigh) && currentHigh > levelValue
+            : this.isNumber(currentLow) && currentLow < levelValue;
+        const previousWasInside = isUp
+            ? previousClose <= levelValue
+            : previousClose >= levelValue;
+        if (!pierced || !previousWasInside) return null;
+
+        const wickPercent = isUp
+            ? ((currentHigh - levelValue) / levelValue) * 100
+            : ((levelValue - currentLow) / levelValue) * 100;
+        if (!Number.isFinite(wickPercent) || wickPercent < minWickBreakPercent) return null;
+
+        const closePercent = isUp
+            ? ((currentPrice - levelValue) / levelValue) * 100
+            : ((levelValue - currentPrice) / levelValue) * 100;
+        const closedBackInside = isUp ? currentPrice <= levelValue : currentPrice >= levelValue;
+        const weakCloseOutside = closePercent > 0
+            && closePercent <= maxWeakClosePercent
+            && closePositionPercent < minClosePositionPercent;
+        const rejectionWick = wickRatio >= minRejectionWickRatio
+            && closePositionPercent < minClosePositionPercent;
+
+        if (!closedBackInside && !weakCloseOutside && !rejectionWick) return null;
+
+        return {
+            ...level,
+            wickPercent,
+            closePercent,
+            wickRatio,
+            closePositionPercent,
+            reason: closedBackInside
+                ? 'closed back inside level'
+                : weakCloseOutside
+                    ? 'weak close beyond level'
+                    : 'rejection wick near level'
+        };
+    },
+
+    clusterPriceLevels: function(levels, tolerance) {
+        if (!Array.isArray(levels) || !levels.length) return [];
+        const safeTolerance = Number.isFinite(Number(tolerance)) && tolerance > 0 ? tolerance : 0.01;
+        const sorted = levels
+            .map(level => ({
+                value: Number(level.value),
+                index: Number(level.index || 0)
+            }))
+            .filter(level => Number.isFinite(level.value))
+            .sort((a, b) => a.value - b.value);
+
+        const clusters = [];
+        sorted.forEach(level => {
+            const cluster = clusters.find(item => Math.abs(item.value - level.value) <= safeTolerance);
+            if (cluster) {
+                cluster.values.push(level.value);
+                cluster.touches += 1;
+                cluster.latestIndex = Math.max(cluster.latestIndex, level.index);
+                cluster.value = cluster.values.reduce((sum, value) => sum + value, 0) / cluster.values.length;
+            } else {
+                clusters.push({
+                    value: level.value,
+                    values: [level.value],
+                    touches: 1,
+                    latestIndex: level.index
+                });
+            }
+        });
+
+        return clusters
+            .map(cluster => ({
+                value: cluster.value,
+                touches: cluster.touches,
+                latestIndex: cluster.latestIndex
+            }))
+            .sort((a, b) => b.touches - a.touches || b.latestIndex - a.latestIndex);
+    },
+
+    calculateMACD: function(prices, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+        if (!Array.isArray(prices) || prices.length < slowPeriod + signalPeriod) return null;
+
+        const fastValues = this.calculateEMAValues(prices, fastPeriod);
+        const slowValues = this.calculateEMAValues(prices, slowPeriod);
+        const macdSeries = [];
+
+        for (let i = 0; i < prices.length; i++) {
+            if (this.isNumber(fastValues[i]) && this.isNumber(slowValues[i])) {
+                macdSeries.push(fastValues[i] - slowValues[i]);
+            }
+        }
+
+        if (macdSeries.length < signalPeriod) return null;
+
+        const signalLine = this.calculateEMA(macdSeries, signalPeriod);
+        const macdLine = macdSeries.at(-1);
+        if (!this.isNumber(macdLine) || !this.isNumber(signalLine)) return null;
+
+        return {
+            macd: macdLine,
+            signal: signalLine,
+            histogram: macdLine - signalLine
+        };
+    },
+
+    calculateBollingerBands: function(prices, period = 20, stdDev = 2) {
+        if (!Array.isArray(prices) || prices.length < period) return null;
+
+        const sma = this.calculateSMA(prices, period);
+        const recentPrices = prices.slice(-period);
+        const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - sma, 2), 0) / period;
+        const standardDeviation = Math.sqrt(variance);
+
+        return {
+            middle: sma,
+            upper: sma + (stdDev * standardDeviation),
+            lower: sma - (stdDev * standardDeviation),
+            bandwidth: sma ? ((stdDev * standardDeviation * 2) / sma) * 100 : 0,
+            currentPrice: prices.at(-1)
+        };
+    },
+
+    calculateATR: function(highs, lows, closes, period = 14) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes)) return null;
+        if (highs.length < period + 1 || lows.length < period + 1 || closes.length < period + 1) return null;
+
+        const trueRanges = [];
+        for (let i = 1; i < highs.length; i++) {
+            trueRanges.push(Math.max(
+                highs[i] - lows[i],
+                Math.abs(highs[i] - closes[i - 1]),
+                Math.abs(lows[i] - closes[i - 1])
+            ));
+        }
+
+        return this.calculateEMA(trueRanges, period);
+    },
+
+    calculateADX: function(highs, lows, closes, period = 14) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes)) return null;
+        if (highs.length < period * 2 || lows.length < period * 2 || closes.length < period * 2) return null;
+
+        const plusDM = [];
+        const minusDM = [];
+        const trueRanges = [];
+
+        for (let i = 1; i < highs.length; i++) {
+            const upMove = highs[i] - highs[i - 1];
+            const downMove = lows[i - 1] - lows[i];
+
+            plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+            minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+            trueRanges.push(Math.max(
+                highs[i] - lows[i],
+                Math.abs(highs[i] - closes[i - 1]),
+                Math.abs(lows[i] - closes[i - 1])
+            ));
+        }
+
+        const smoothedTR = this.calculateEMAValues(trueRanges, period);
+        const smoothedPlusDM = this.calculateEMAValues(plusDM, period);
+        const smoothedMinusDM = this.calculateEMAValues(minusDM, period);
+        const dxSeries = [];
+
+        for (let i = 0; i < trueRanges.length; i++) {
+            const tr = smoothedTR[i];
+            if (!tr) continue;
+
+            const plusDI = (smoothedPlusDM[i] / tr) * 100;
+            const minusDI = (smoothedMinusDM[i] / tr) * 100;
+            const denominator = plusDI + minusDI;
+            if (!denominator) continue;
+
+            dxSeries.push(Math.abs((plusDI - minusDI) / denominator) * 100);
+        }
+
+        const adx = this.calculateEMA(dxSeries, period);
+        const lastTR = smoothedTR.at(-1);
+        if (!this.isNumber(adx) || !lastTR) return null;
+
+        return {
+            adx: adx,
+            plusDI: (smoothedPlusDM.at(-1) / lastTR) * 100,
+            minusDI: (smoothedMinusDM.at(-1) / lastTR) * 100
+        };
+    },
+
+    calculateStochastic: function(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
+        if (!Array.isArray(highs) || !Array.isArray(lows) || !Array.isArray(closes)) return null;
+        if (closes.length < kPeriod + dPeriod) return null;
+
+        const kValues = [];
+        for (let i = kPeriod - 1; i < closes.length; i++) {
+            const recentHighs = highs.slice(i - kPeriod + 1, i + 1);
+            const recentLows = lows.slice(i - kPeriod + 1, i + 1);
+            const highestHigh = Math.max(...recentHighs);
+            const lowestLow = Math.min(...recentLows);
+            const range = highestHigh - lowestLow;
+            kValues.push(range === 0 ? 50 : ((closes[i] - lowestLow) / range) * 100);
+        }
+
+        const k = kValues.at(-1);
+        const d = this.calculateSMA(kValues, dPeriod);
+        if (!this.isNumber(k) || !this.isNumber(d)) return null;
+
+        return { k, d };
+    },
+
+    getIndicatorSignal: function(indicator, value, params = {}) {
+        if (value === null || value === undefined) return 'HOLD';
+
+        switch (indicator) {
+            case 'RSI': {
+                if (!this.isNumber(value)) return 'HOLD';
+                // Raw RSI is display-only. AdvancedRSI applies the transcript rules
+                // with cross-back and confirmation instead of plain 70/30 signals.
+                return 'HOLD';
+            }
+
+            case 'AdvancedRSI':
+                if (!value || !value.signal) return 'HOLD';
+                return ['BUY', 'SELL'].includes(value.signal) ? value.signal : 'HOLD';
+
+            case 'OBV':
+                if (!value || !value.direction) return 'HOLD';
+                if (value.direction === 'BULLISH') return 'BUY';
+                if (value.direction === 'BEARISH') return 'SELL';
+                return 'HOLD';
+
+            case 'Engulfing':
+                if (!value || !value.type) return 'HOLD';
+                if (value.type === 'BULLISH') return 'BUY';
+                if (value.type === 'BEARISH') return 'SELL';
+                return 'HOLD';
+
+            case 'MotherVolume':
+                if (!value || !value.isMother) return 'HOLD';
+                if (value.direction === 'BULLISH' && value.breakout === 'UP' && value.closePosition >= 60) return 'BUY';
+                if (value.direction === 'BEARISH' && value.breakout === 'DOWN' && value.closePosition <= 40) return 'SELL';
+                return 'HOLD';
+
+            case 'CandlestickPatterns':
+            case 'FibonacciContext':
+            case 'ChartPatterns':
+                if (!value || !value.direction || Number(value.strength || 0) < 58) return 'HOLD';
+                if (value.direction === 'BULLISH') return 'BUY';
+                if (value.direction === 'BEARISH') return 'SELL';
+                return 'HOLD';
+
+            case 'MACD':
+                if (!value || !this.isNumber(value.histogram) || !this.isNumber(value.macd) || !this.isNumber(value.signal)) return 'HOLD';
+                if (value.histogram > 0 && value.macd > value.signal) return 'BUY';
+                if (value.histogram < 0 && value.macd < value.signal) return 'SELL';
+                return 'HOLD';
+
+            case 'BollingerBands':
+                if (!value || !this.isNumber(value.currentPrice) || !this.isNumber(value.lower) || !this.isNumber(value.upper)) return 'HOLD';
+                if (value.currentPrice < value.lower) return 'BUY';
+                if (value.currentPrice > value.upper) return 'SELL';
+                return 'HOLD';
+
+            case 'EMA':
+                if (!value || !this.isNumber(value.short) || !this.isNumber(value.long)) return 'HOLD';
+                if (value.short > value.long) return 'BUY';
+                if (value.short < value.long) return 'SELL';
+                return 'HOLD';
+
+            case 'ADX':
+                if (!value || !this.isNumber(value.adx) || !this.isNumber(value.plusDI) || !this.isNumber(value.minusDI)) return 'HOLD';
+                if (value.adx > 22) {
+                    if (value.plusDI > value.minusDI) return 'BUY';
+                    if (value.minusDI > value.plusDI) return 'SELL';
+                }
+                return 'HOLD';
+
+            case 'Stochastic': {
+                const overbought = params.overbought ?? 80;
+                const oversold = params.oversold ?? 20;
+                if (!value || !this.isNumber(value.k) || !this.isNumber(value.d)) return 'HOLD';
+                if (value.k < oversold && value.d < oversold) return 'BUY';
+                if (value.k > overbought && value.d > overbought) return 'SELL';
+                return 'HOLD';
+            }
+
+            case 'Volume': {
+                const multiplier = params.spikeMultiplier ?? 1.15;
+                if (!value || !this.isNumber(value.ratio)) return 'HOLD';
+                if (value.ratio >= multiplier && value.priceDirection === 'UP') return 'BUY';
+                if (value.ratio >= multiplier && value.priceDirection === 'DOWN') return 'SELL';
+                return 'HOLD';
+            }
+
+            case 'PivotPoints': {
+                const neutralBandPercent = params.neutralBandPercent ?? 0.05;
+                if (!value || !this.isNumber(value.currentPrice) || !this.isNumber(value.pivot)) return 'HOLD';
+
+                const distancePercent = Math.abs(value.currentPrice - value.pivot) / value.currentPrice * 100;
+                if (distancePercent <= neutralBandPercent) return 'HOLD';
+                if (value.currentPrice > value.pivot) return 'BUY';
+                if (value.currentPrice < value.pivot) return 'SELL';
+                return 'HOLD';
+            }
+
+            default:
+                return 'HOLD';
+        }
+    }
+};

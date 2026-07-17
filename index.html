@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Signal Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; font-size: 14px; line-height: 1.5; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 16px; }
+
+        /* HEADER */
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; margin-bottom: 16px; }
+        .header h1 { font-size: 22px; font-weight: 700; color: #4fc3f7; }
+        .header .subtitle { font-size: 13px; color: #888; margin-top: 2px; }
+        .api-status { display: flex; gap: 14px; align-items: center; font-size: 13px; }
+        .status-disconnected { color: #ef5350; font-weight: 600; }
+        .status-connected { color: #66bb6a; font-weight: 600; }
+
+        /* CONFIG */
+        .config-panel { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+        .config-panel h2 { font-size: 18px; margin-bottom: 14px; color: #e0e0e0; }
+        .config-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label { font-size: 13px; color: #aaa; font-weight: 600; }
+        .form-group input, .form-group select { padding: 10px 14px; background: #0f3460; border: 1px solid #3a3a5a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+        .form-group input:focus { border-color: #4fc3f7; outline: none; }
+        .helper-text { font-size: 12px; color: #777; margin-top: 8px; }
+
+        /* BUTTONS */
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #4fc3f7; color: #000; }
+        .btn-secondary { background: #2a2a4a; color: #e0e0e0; border: 1px solid #3a3a5a; }
+        .btn-small { padding: 8px 14px; font-size: 13px; }
+        .button-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+        /* INDEX CARDS */
+        .index-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 16px; }
+        .card { background: #16213e; border: 2px solid #2a2a4a; border-radius: 12px; padding: 20px 16px; text-align: center; }
+        .card h3 { font-size: 14px; color: #aaa; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card .price { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+        .card .change { margin-bottom: 8px; font-size: 16px; font-weight: 700; }
+        .up { color: #66bb6a !important; }
+        .down { color: #ef5350 !important; }
+        .flat { color: #aaa !important; }
+        .ohlc { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 13px; color: #ccc; margin: 8px 0; padding: 8px 10px; background: #0f3460; border-radius: 8px; text-align: left; }
+        .ohlc .lbl { color: #777; font-weight: 500; }
+        .mini-chart { display: block; margin: 8px auto 0; width: 100%; height: 35px; }
+
+        /* P&L CARDS */
+        .pnl-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+        .pnl-card { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 22px; }
+        .pnl-card-header { font-size: 13px; color: #888; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; letter-spacing: 1px; }
+        .pnl-card-main { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
+        .pnl-card-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-top: 1px solid #2a2a4a; }
+        .pnl-card-label { color: #888; }
+        .pnl-card-value { font-weight: 600; color: #e0e0e0; }
+
+        /* SECTIONS */
+        .section { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; margin-bottom: 14px; }
+        .section-heading { display: flex; justify-content: space-between; align-items: center; padding: 16px 22px; cursor: pointer; }
+        .section-heading:hover { background: #1a2744; }
+        .section-heading h2 { font-size: 17px; font-weight: 600; color: #e0e0e0; }
+        .section-body { padding: 0 22px 22px; }
+        .section-body.collapsed { display: none; }
+        .collapse-arrow { font-size: 15px; color: #777; transition: transform 0.2s; }
+        .collapse-arrow.open { transform: rotate(90deg); }
+
+        /* OPTIONS SELECTOR — BIGGER */
+        .options-selector { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }
+        .options-selector label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #aaa; font-weight: 500; }
+        .options-selector select, .options-selector input { padding: 10px 14px; background: #0f3460; border: 1px solid #3a3a5a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+        .checkbox-label { flex-direction: row !important; align-items: center; gap: 8px !important; }
+
+        /* TABLES */
+        .options-table { overflow-x: auto; }
+        .options-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .options-table th { background: #0f3460; padding: 12px 14px; text-align: left; font-weight: 600; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .options-table td { padding: 10px 14px; border-bottom: 1px solid #2a2a4a; color: #e0e0e0; }
+        .options-table tr:hover { background: #1a2744; }
+
+        /* TRADE STATUS */
+        .trade-status { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+        .status-open { background: #1565c0; color: #fff; }
+        .status-target { background: #2e7d32; color: #fff; }
+        .status-sl { background: #c62828; color: #fff; }
+        .status-trend { background: #f57f17; color: #000; }
+        .status-expired { background: #555; color: #fff; }
+
+        .segment-tag { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .segment-index { background: #1565c0; color: #fff; }
+        .segment-stock { background: #7b1fa2; color: #fff; }
+        .segment-commodity { background: #f57f17; color: #000; }
+
+        /* SCAN STATUS */
+        .scan-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+        .scan-status-card { background: #0f3460; border-radius: 10px; padding: 14px; font-size: 13px; }
+        .scan-status-card span { color: #777; font-size: 12px; }
+        .scan-status-card strong { font-size: 16px; color: #e0e0e0; display: block; margin-top: 3px; }
+
+        /* HISTORY */
+        .history-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+        .history-card { background: #0f3460; border-radius: 10px; padding: 16px; text-align: center; }
+        .history-card-label { font-size: 12px; color: #777; text-transform: uppercase; }
+        .history-card-value { font-size: 22px; font-weight: 700; color: #e0e0e0; margin-top: 4px; }
+        .history-card-sub { font-size: 11px; color: #888; margin-top: 3px; }
+
+        /* OPTION SUMMARY — BIG CALL BOX */
+        .option-summary { background: #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 14px; font-size: 14px; color: #e0e0e0; border-left: 4px solid #4fc3f7; }
+        .summary-title { font-weight: 700; margin-bottom: 10px; font-size: 16px; color: #4fc3f7; }
+        .summary-metrics { display: flex; gap: 20px; flex-wrap: wrap; }
+        .summary-metric { font-size: 13px; color: #aaa; }
+        .summary-metric strong { display: block; font-size: 18px; color: #fff; margin-top: 3px; }
+
+        /* SIGNALS — BIG CARD */
+        .signal-card { background: #0f3460; border-left: 4px solid #4fc3f7; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 10px; }
+        .signal-card.buy { border-left-color: #66bb6a; }
+        .signal-card.sell { border-left-color: #ef5350; }
+        .signal-card h4 { font-size: 16px; color: #fff; margin-bottom: 6px; }
+        .signal-details { font-size: 13px; color: #aaa; line-height: 1.6; }
+
+        /* LOG */
+        .log-container { background: #0f3460; border-radius: 10px; padding: 12px; max-height: 220px; overflow-y: auto; font-family: monospace; font-size: 13px; }
+        .log-entry { padding: 3px 0; color: #aaa; border-bottom: 1px solid #1a2744; }
+
+        .hidden { display: none !important; }
+        .no-signals { color: #777; padding: 24px; text-align: center; font-size: 14px; }
+        .table-note { font-size: 11px; color: #777; display: block; }
+        .table-toggle-row { margin-bottom: 10px; }
+        .table-dropdown-toggle { background: #0f3460; border: 1px solid #3a3a5a; color: #aaa; cursor: pointer; font-size: 13px; padding: 6px 14px; border-radius: 8px; }
+        .table-dropdown-toggle:hover { background: #1a2744; }
+        .trade-symbol-button { background: none; border: none; color: #e0e0e0; cursor: pointer; text-align: left; padding: 0; font: inherit; }
+        .trade-symbol-button:hover { color: #4fc3f7; }
+        .trade-row-actions { margin-top: 4px; }
+
+        .indicators-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+        .indicator-card { background: #0f3460; border-radius: 10px; padding: 14px; }
+        .indicator-card h4 { font-size: 13px; color: #777; margin-bottom: 6px; }
+        .indicator-value { font-size: 18px; font-weight: 700; color: #fff; }
+        .indicator-status { font-size: 12px; color: #aaa; margin-top: 3px; }
+
+        /* P&L color classes */
+        .pnl-positive, td.pnl-positive, span.pnl-positive { color: #66bb6a !important; }
+        .pnl-negative, td.pnl-negative, span.pnl-negative { color: #ef5350 !important; }
+        .history-stats.up { color: #66bb6a !important; }
+        .history-stats.down { color: #ef5350 !important; }
+
+        @media (max-width: 1200px) { .index-cards { grid-template-columns: repeat(3, 1fr); } .pnl-summary { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) { .index-cards { grid-template-columns: repeat(2, 1fr); } .pnl-summary { grid-template-columns: 1fr; } .scan-status-grid { grid-template-columns: repeat(2, 1fr); } .history-cards { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header class="header">
+        <div>
+            <h1>Options Signal Scanner</h1>
+            <p class="subtitle">Index / Stock / Commodity — Live signals with P&L tracking</p>
+        </div>
+        <div class="api-status">
+            <span id="connectionStatus" class="status-disconnected">Disconnected</span>
+            <span id="lastUpdate" style="color:#777">--:--:--</span>
+        </div>
+    </header>
+
+    <div class="config-panel" id="configPanel">
+        <h2>Angel One API</h2>
+        <div class="config-form">
+            <div class="form-group"><label>API Key</label><input type="text" id="apiKey" placeholder="API key"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="apiSecret" placeholder="Password"></div>
+            <div class="form-group"><label>Client ID</label><input type="text" id="clientId" placeholder="Client ID"></div>
+            <div class="form-group"><label>TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP"></div>
+            <div class="form-group"><label>Static IP</label><input type="text" id="publicIp" placeholder="SmartAPI IP"></div>
+            <div class="button-row" style="align-self:end">
+                <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
+                <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
+            </div>
+        </div>
+        <p class="helper-text" id="loginError"></p>
+    </div>
+
+    <main class="dashboard" id="dashboard" style="display:none">
+
+        <!-- INDEX CARDS -->
+        <section class="index-cards">
+            <div class="card" id="niftyCard"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="change" id="niftyChange">--</div><div class="ohlc" id="niftyOhlc"></div><canvas class="mini-chart" id="niftyChart" width="200" height="35"></canvas></div>
+            <div class="card" id="bankniftyCard"><h3>BANKNIFTY</h3><div class="price" id="bankniftyPrice">--</div><div class="change" id="bankniftyChange">--</div><div class="ohlc" id="bankniftyOhlc"></div><canvas class="mini-chart" id="bankniftyChart" width="200" height="35"></canvas></div>
+            <div class="card" id="sensexCard"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="change" id="sensexChange">--</div><div class="ohlc" id="sensexOhlc"></div><canvas class="mini-chart" id="sensexChart" width="200" height="35"></canvas></div>
+            <div class="card" id="finniftyCard"><h3>FINNIFTY</h3><div class="price" id="finniftyPrice">--</div><div class="change" id="finniftyChange">--</div><div class="ohlc" id="finniftyOhlc"></div><canvas class="mini-chart" id="finniftyChart" width="200" height="35"></canvas></div>
+            <div class="card" id="midcpniftyCard"><h3>MIDCAP</h3><div class="price" id="midcpniftyPrice">--</div><div class="change" id="midcpniftyChange">--</div><div class="ohlc" id="midcpniftyOhlc"></div><canvas class="mini-chart" id="midcpniftyChart" width="200" height="35"></canvas></div>
+        </section>
+
+        <!-- P&L -->
+        <section class="pnl-summary">
+            <div class="pnl-card">
+                <div class="pnl-card-header">Index P&L</div>
+                <div class="pnl-card-main" id="indexPnlMain">0.00</div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open P&L</span><span class="pnl-card-value" id="indexPnlOpen">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Closed P&L</span><span class="pnl-card-value" id="indexPnlClosed">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open / Closed</span><span class="pnl-card-value"><span id="indexPnlOpenCount">0</span> / <span id="indexPnlClosedCount">0</span></span></div>
+            </div>
+            <div class="pnl-card">
+                <div class="pnl-card-header">Stock P&L</div>
+                <div class="pnl-card-main" id="stockPnlMain">0.00</div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open P&L</span><span class="pnl-card-value" id="stockPnlOpen">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Closed P&L</span><span class="pnl-card-value" id="stockPnlClosed">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open / Closed</span><span class="pnl-card-value"><span id="stockPnlOpenCount">0</span> / <span id="stockPnlClosedCount">0</span></span></div>
+            </div>
+            <div class="pnl-card">
+                <div class="pnl-card-header">Commodity P&L</div>
+                <div class="pnl-card-main" id="commodityPnlMain">0.00</div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open P&L</span><span class="pnl-card-value" id="commodityPnlOpen">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Closed P&L</span><span class="pnl-card-value" id="commodityPnlClosed">0.00</span></div>
+                <div class="pnl-card-row"><span class="pnl-card-label">Open / Closed</span><span class="pnl-card-value"><span id="commodityPnlOpenCount">0</span> / <span id="commodityPnlClosedCount">0</span></span></div>
+            </div>
+        </section>
+
+        <!-- OPTIONS CHAIN -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Options Chain Scanner</h2><span class="collapse-arrow open">&#9654;</span></div>
+            <div class="section-body">
+                <div class="options-selector">
+                    <label>Segment<select id="optionSegment" onchange="handleOptionSegmentChange(); runMarketWideScan(true)"><option value="INDEX">Index</option><option value="STOCK">Stock</option><option value="COMMODITY">Commodity</option></select></label>
+                    <label id="indexField">Index<select id="indexSelector" onchange="loadOptionsChain(true); runMarketWideScan(true)"><option value="NIFTY">NIFTY</option><option value="BANKNIFTY">BANKNIFTY</option><option value="FINNIFTY">FINNIFTY</option><option value="MIDCPNIFTY">MIDCAP</option><option value="SENSEX">SENSEX</option></select></label>
+                    <label class="stock-field hidden">Stock<input type="text" id="stockSymbol" placeholder="Blank = all F&O" onblur="runMarketWideScan(true)"></label>
+                    <label class="stock-field hidden">Token<input type="text" id="stockToken" placeholder="Angel token" onblur="runMarketWideScan(true)"></label>
+                    <label class="commodity-field hidden">Commodity<select id="commoditySelector" onchange="loadOptionsChain(true); runMarketWideScan(true)"><option value="CRUDEOIL">CRUDEOIL</option><option value="NATURALGAS">NATURALGAS</option><option value="GOLD">GOLD</option><option value="SILVER">SILVER</option><option value="COPPER">COPPER</option></select></label>
+                    <label>Expiry<select id="expirySelector" onchange="refreshOptionsForSelectedExpiry()"><option value="">Select</option></select></label>
+                    <label>Candle<select id="timeframeSelector" onchange="updateIndicators()"><option value="ONE_MINUTE">1m</option><option value="FIVE_MINUTE" selected>5m</option><option value="FIFTEEN_MINUTE">15m</option><option value="ONE_DAY">1D</option></select></label>
+                    <label class="checkbox-label"><input type="checkbox" id="autoRefreshToggle" onchange="toggleOptionAutoRefresh()" checked> Auto</label>
+                    <button class="btn btn-small" onclick="refreshOptionsForSelectedExpiry({force:true})">Refresh</button>
+                </div>
+                <div class="option-summary" id="optionSummary"><div class="summary-title">Best setup will appear after data loads.</div></div>
+                <div class="table-toggle-row"><button class="btn btn-small table-dropdown-toggle" onclick="toggleOptionChainTable()"><span id="optionChainTableArrow">+</span> Option Chain Table</button></div>
+                <div class="options-table hidden" id="optionChainTableWrap">
+                    <table><thead><tr><th>Strike</th><th>Call LTP</th><th>Call Score</th><th>Call Signal</th><th>Put LTP</th><th>Put Score</th><th>Put Signal</th><th>Risk</th></tr></thead><tbody id="optionsTableBody"><tr><td colspan="8">Waiting for data...</td></tr></tbody></table>
+                </div>
+            </div>
+        </section>
+
+        <!-- AUTO SCANNER -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Auto Market Scanner</h2><span class="collapse-arrow open">&#9654;</span></div>
+            <div class="section-body">
+                <div class="button-row" style="margin-bottom:14px">
+                    <select id="autoScanScope" onchange="changeAutoScanScope()"><option value="MARKET" selected>All F&O</option><option value="STOCKS">Stocks</option><option value="COMMODITIES">Commodities</option><option value="INDICES">Indices</option><option value="SELECTED">Selected</option></select>
+                    <button class="btn btn-small" id="marketScanToggle" onclick="toggleMarketWideScan()">Pause</button>
+                    <button class="btn btn-small" onclick="runMarketWideScan(true)">Scan Now</button>
+                </div>
+                <div class="scan-status-grid">
+                    <div class="scan-status-card"><span>Status</span><strong id="marketScanStatus">Waiting</strong></div>
+                    <div class="scan-status-card"><span>Last Scan</span><strong id="marketScanLastRun">--</strong></div>
+                    <div class="scan-status-card"><span>Symbols</span><strong id="marketScanCount">--</strong></div>
+                    <div class="scan-status-card"><span>Mood</span><strong id="marketMoodStatus">--</strong></div>
+                </div>
+                <div class="auto-scan-results" id="marketScanResults"><div class="no-signals">Scanner results will appear here.</div></div>
+            </div>
+        </section>
+
+        <!-- ACTIVE TRADES -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Active Trades</h2><span class="collapse-arrow open">&#9654;</span></div>
+            <div class="section-body">
+                <div class="button-row" style="margin-bottom:10px">
+                    <span id="optionHistoryStats" style="font-size:13px;color:#aaa">0 open | 0 closed</span>
+                    <button class="btn btn-small" onclick="clearOptionTradeHistory()">Clear All</button>
+                </div>
+                <div class="options-table">
+                    <table><thead><tr><th>Time</th><th>Symbol</th><th>Expiry</th><th>Strike</th><th>Side</th><th>Entry</th><th>SL</th><th>Target</th><th>LTP</th><th>P&L</th><th>Lot P&L</th><th>Result</th></tr></thead><tbody id="optionHistoryBody"><tr><td colspan="12">No calls yet.</td></tr></tbody></table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CALL HISTORY -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Call History & Daily P&L</h2><span class="collapse-arrow">&#9654;</span></div>
+            <div class="section-body collapsed">
+                <div class="button-row" style="margin-bottom:14px">
+                    <select id="historyDateFilter" onchange="renderHistoryView()"><option value="today">Today</option><option value="yesterday">Yesterday</option><option value="all">All Time</option></select>
+                    <button class="btn btn-small" onclick="renderHistoryView()">Refresh</button>
+                </div>
+                <div class="history-cards" id="historySummary"></div>
+                <div class="options-table">
+                    <table><thead><tr><th>Time</th><th>Segment</th><th>Symbol</th><th>Strike</th><th>Entry</th><th>SL</th><th>Target</th><th>P&L</th><th>Status</th></tr></thead><tbody id="historyViewBody"><tr><td colspan="9">Select a date.</td></tr></tbody></table>
+                </div>
+            </div>
+        </section>
+
+        <!-- INDICATORS — SEPARATE SECTION -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Technical Indicators</h2><span class="collapse-arrow">&#9654;</span></div>
+            <div class="section-body collapsed">
+                <select id="indicatorSelector" onchange="refreshDisplayedIndicators()" style="margin-bottom:14px;padding:10px 14px;background:#0f3460;border:1px solid #3a3a5a;border-radius:8px;color:#e0e0e0;font-size:14px">
+                    <option value="NIFTY">NIFTY</option><option value="BANKNIFTY">BANKNIFTY</option><option value="FINNIFTY">FINNIFTY</option>
+                    <option value="MIDCPNIFTY">MIDCAP</option><option value="SENSEX">SENSEX</option>
+                    <option value="CRUDEOIL">CRUDEOIL</option><option value="GOLD">GOLD</option><option value="SILVER">SILVER</option>
+                </select>
+                <div class="indicators-grid">
+                    <div class="indicator-card"><h4>RSI (14)</h4><div class="indicator-value" id="rsiValue">--</div><div class="indicator-status" id="rsiStatus">--</div></div>
+                    <div class="indicator-card"><h4>MACD</h4><div class="indicator-value" id="macdValue">--</div><div class="indicator-status" id="macdStatus">--</div></div>
+                    <div class="indicator-card"><h4>Bollinger</h4><div class="indicator-value" id="bbValue">--</div><div class="indicator-status" id="bbStatus">--</div></div>
+                    <div class="indicator-card"><h4>EMA (9,21)</h4><div class="indicator-value" id="emaValue">--</div><div class="indicator-status" id="emaStatus">--</div></div>
+                    <div class="indicator-card"><h4>ADX</h4><div class="indicator-value" id="adxValue">--</div><div class="indicator-status" id="adxStatus">--</div></div>
+                    <div class="indicator-card"><h4>Stochastic</h4><div class="indicator-value" id="stochValue">--</div><div class="indicator-status" id="stochStatus">--</div></div>
+                    <div class="indicator-card"><h4>Volume</h4><div class="indicator-value" id="volumeValue">--</div><div class="indicator-status" id="volumeStatus">--</div></div>
+                    <div class="indicator-card"><h4>VWAP</h4><div class="indicator-value" id="vwapValue">--</div><div class="indicator-status" id="vwapStatus">--</div></div>
+                    <div class="indicator-card"><h4>Pivot Points</h4><div class="indicator-value" id="pivotValue">--</div><div class="indicator-status" id="pivotStatus">--</div></div>
+                    <div class="indicator-card"><h4>Support/Resist</h4><div class="indicator-value" id="srValue">--</div><div class="indicator-status" id="srStatus">--</div></div>
+                    <div class="indicator-card"><h4>ICT / SMC</h4><div class="indicator-value" id="ictSystemValue">--</div><div class="indicator-status" id="ictSystemStatus">--</div></div>
+                    <div class="indicator-card"><h4>ORB / Gap</h4><div class="indicator-value" id="orbSystemValue">--</div><div class="indicator-status" id="orbSystemStatus">--</div></div>
+                    <div class="indicator-card"><h4>Candlestick</h4><div class="indicator-value" id="candlestickValue">--</div><div class="indicator-status" id="candlestickStatus">--</div></div>
+                    <div class="indicator-card"><h4>Fibonacci</h4><div class="indicator-value" id="fibonacciValue">--</div><div class="indicator-status" id="fibonacciStatus">--</div></div>
+                    <div class="indicator-card"><h4>Chart Patterns</h4><div class="indicator-value" id="chartPatternValue">--</div><div class="indicator-status" id="chartPatternStatus">--</div></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TELEGRAM -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Telegram Alerts</h2><span class="collapse-arrow">&#9654;</span></div>
+            <div class="section-body collapsed">
+                <div class="options-selector">
+                    <label class="checkbox-label"><input type="checkbox" id="telegramEnabled" onchange="TelegramNotifier.saveFromForm()"> Enable</label>
+                    <label>Bot Token<input type="password" id="telegramBotToken" placeholder="Token" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Chat ID<input type="text" id="telegramChatId" placeholder="Chat ID" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Bot 2<input type="password" id="telegramBotToken2" placeholder="Optional" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Chat 2<input type="text" id="telegramChatId2" placeholder="Optional" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Relay URL<input type="url" id="telegramRelayUrl" placeholder="Relay" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Min Score<input type="number" id="telegramMinScore" min="60" max="100" value="70" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <div class="button-row"><button class="btn btn-small" onclick="TelegramNotifier.resetSentSignals()">Reset</button><button class="btn btn-small" onclick="TelegramNotifier.sendTest()">Test</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ACTIVE SIGNALS — SEPARATE FROM INDICATORS -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Active Call Signals</h2><span class="collapse-arrow">&#9654;</span></div>
+            <div class="section-body collapsed">
+                <button class="btn btn-small" onclick="clearActiveOptionSignals()" style="margin-bottom:10px">Clear</button>
+                <div class="signals-container" id="signalsContainer"><div class="no-signals">Waiting for call signals...</div></div>
+            </div>
+        </section>
+
+        <!-- LOG -->
+        <section class="section">
+            <div class="section-heading" onclick="toggleSection(this)"><h2>Signal Log</h2><span class="collapse-arrow">&#9654;</span></div>
+            <div class="section-body collapsed">
+                <div class="log-container" id="logContainer"><div class="log-entry">System initialized...</div></div>
+            </div>
+        </section>
+
+    </main>
+</div>
+<script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}</script>
+<script src="js/config.js"></script>
+<script src="js/technical-indicators.js"></script>
+<script src="js/angel-one-api.js"></script>
+<script src="js/signal-generator.js"></script>
+<script src="js/option-signal-engine.js"></script>
+<script src="js/telegram-notifier.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
