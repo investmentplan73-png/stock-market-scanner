@@ -96,12 +96,17 @@ function loadSavedCredentials() {
 
     try {
         const config = JSON.parse(saved);
+        const badClientId = /^(admin|root|test|demo|user)$/i.test(String(config.clientId || '').trim());
         document.getElementById('apiKey').value = config.apiKey || '';
         document.getElementById('apiSecret').value = config.apiSecret || '';
-        document.getElementById('clientId').value = config.clientId || '';
+        document.getElementById('clientId').value = badClientId ? '' : (config.clientId || '');
         document.getElementById('totpSecret').value = '';
         const publicIp = document.getElementById('publicIp');
         if (publicIp) publicIp.value = config.publicIp || '';
+        if (badClientId) {
+            Config.clientId = '';
+            Config.saveConfig();
+        }
     } catch (error) {
         console.warn('Could not load saved credentials', error);
     }

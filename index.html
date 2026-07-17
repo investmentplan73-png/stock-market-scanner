@@ -167,13 +167,21 @@
 
     <div class="config-panel" id="configPanel">
         <h2>Angel One API</h2>
-        <p class="helper-text" style="margin-bottom:12px; color:#6cc; font-size:13px;">Ye sab Angel One SmartAPI dashboard se milta hai: <a href="https://smartapi.angelone.in" target="_blank" style="color:#6cf;">smartapi.angelone.in</a> → Developer → My Apps</p>
+        <div style="background:#1a2332;border:1px solid #334;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#9ab;line-height:1.7">
+            <b style="color:#6cf">Kaise login karein:</b><br>
+            1. <a href="https://smartapi.angelone.in" target="_blank" style="color:#6cf">smartapi.angelone.in</a> pe login karo<br>
+            2. <b>Developer → My Apps</b> me jao → wahan <b>API Key</b> milega<br>
+            3. <b>Client ID</b> = tumhara Angel One account number (jaise <code style="background:#223;padding:1px 5px;border-radius:3px;color:#fca">g53589</code>) — ye login page pe dikhta hai<br>
+            4. <b>Password</b> = tumhara Angel One login password<br>
+            5. Phone me <b>Google Authenticator</b> kholo → abhi jo <b>6-digit code</b> dikh raha hai wo <b>TOTP</b> field me dalo<br>
+            6. Apne browser me <a href="https://whatismyipaddress.com" target="_blank" style="color:#6cf">whatismyipaddress.com</a> kholo → jo <b>IP</b> dikhe wo <b>Static IP</b> field me dalo
+        </div>
         <div class="config-form">
-            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="Developer → My Apps se milega"></div>
+            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="SmartAPI → My Apps se copy karo"></div>
             <div class="form-group"><label>Password <span style="color:#f88">*</span></label><input type="password" id="apiSecret" placeholder="Angel One login password"></div>
-            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="Tumhara Angel One login ID (jaise g53589)"></div>
+            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="Angel One account number (g53589 jaisa)"></div>
             <div class="form-group"><label>TOTP <span style="color:#f88">*</span></label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="Google Authenticator ka 6-digit code"></div>
-            <div class="form-group"><label>Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="whatismyipaddress.com se apna IP"></div>
+            <div class="form-group"><label>Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="whatismyipaddress.com se apna public IP"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
