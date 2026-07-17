@@ -106,13 +106,12 @@
         .history-card-value { font-size: 22px; font-weight: 700; color: #e0e0e0; margin-top: 4px; }
         .history-card-sub { font-size: 11px; color: #888; margin-top: 3px; }
 
-        /* OPTION SUMMARY */
-        .option-summary { background: #0f3460; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; font-size: 12px; color: #e0e0e0; border-left: 4px solid #4fc3f7; }
-        .summary-title { font-weight: 700; margin-bottom: 4px; font-size: 14px; color: #4fc3f7; }
-        .summary-grid { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
-        .summary-metric { font-size: 11px; color: #aaa; white-space: nowrap; }
-        .summary-metric strong { display: inline; font-size: 13px; color: #fff; margin-left: 3px; }
-        .summary-reasons { font-size: 11px; color: #aaa; max-height: 2.8em; overflow: hidden; line-height: 1.4; margin-top: 4px; }
+        /* OPTION SUMMARY — BIG CALL BOX */
+        .option-summary { background: #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 14px; font-size: 14px; color: #e0e0e0; border-left: 4px solid #4fc3f7; }
+        .summary-title { font-weight: 700; margin-bottom: 10px; font-size: 16px; color: #4fc3f7; }
+        .summary-metrics { display: flex; gap: 20px; flex-wrap: wrap; }
+        .summary-metric { font-size: 13px; color: #aaa; }
+        .summary-metric strong { display: block; font-size: 18px; color: #fff; margin-top: 3px; }
 
         /* SIGNALS — BIG CARD */
         .signal-card { background: #0f3460; border-left: 4px solid #4fc3f7; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 10px; }
@@ -135,11 +134,11 @@
         .trade-symbol-button:hover { color: #4fc3f7; }
         .trade-row-actions { margin-top: 4px; }
 
-        .indicators-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
-        .indicator-card { background: #0f3460; border-radius: 8px; padding: 10px; }
-        .indicator-card h4 { font-size: 11px; color: #777; margin-bottom: 4px; }
-        .indicator-value { font-size: 15px; font-weight: 700; color: #fff; }
-        .indicator-status { font-size: 11px; color: #aaa; margin-top: 2px; }
+        .indicators-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+        .indicator-card { background: #0f3460; border-radius: 10px; padding: 14px; }
+        .indicator-card h4 { font-size: 13px; color: #777; margin-bottom: 6px; }
+        .indicator-value { font-size: 18px; font-weight: 700; color: #fff; }
+        .indicator-status { font-size: 12px; color: #aaa; margin-top: 3px; }
 
         /* P&L color classes */
         .pnl-positive, td.pnl-positive, span.pnl-positive { color: #66bb6a !important; }
@@ -167,25 +166,15 @@
 
     <div class="config-panel" id="configPanel">
         <h2>Angel One API</h2>
-        <div style="background:#1a2332;border:1px solid #334;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#9ab;line-height:1.7">
-            <b style="color:#6cf">Kaise login karein:</b><br>
-            1. <a href="https://smartapi.angelone.in" target="_blank" style="color:#6cf">smartapi.angelone.in</a> pe login karo<br>
-            2. <b>Developer → My Apps</b> me jao → wahan <b>API Key</b> milega<br>
-            3. <b>Client ID</b> = tumhara Angel One account number (jaise <code style="background:#223;padding:1px 5px;border-radius:3px;color:#fca">g53589</code>) — ye login page pe dikhta hai<br>
-            4. <b>Password</b> = tumhara Angel One login password<br>
-            5. Phone me <b>Google Authenticator</b> kholo → abhi jo <b>6-digit code</b> dikh raha hai wo <b>TOTP</b> field me dalo<br>
-            6. Apne browser me <a href="https://whatismyipaddress.com" target="_blank" style="color:#6cf">whatismyipaddress.com</a> kholo → jo <b>IP</b> dikhe wo <b>Static IP</b> field me dalo
-        </div>
         <div class="config-form">
-            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="SmartAPI → My Apps se copy karo"></div>
-            <div class="form-group"><label>Password <span style="color:#f88">*</span></label><input type="password" id="apiSecret" placeholder="Angel One login password"></div>
-            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="Angel One account number (g53589 jaisa)"></div>
-            <div class="form-group"><label>TOTP <span style="color:#f88">*</span></label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="Google Authenticator ka 6-digit code"></div>
-            <div class="form-group" style="display:flex;align-items:end;gap:6px"><label style="flex:1">Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="click Detect IP button" style="flex:2"><button type="button" class="btn" style="background:#2a5a3a;color:#8f8;font-size:11px;padding:6px 10px;border-radius:6px;white-space:nowrap" onclick="autoDetectMyIp()">Detect IP</button></div>
+            <div class="form-group"><label>API Key</label><input type="text" id="apiKey" placeholder="API key"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="apiSecret" placeholder="Password"></div>
+            <div class="form-group"><label>Client ID</label><input type="text" id="clientId" placeholder="Client ID"></div>
+            <div class="form-group"><label>TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP"></div>
+            <div class="form-group"><label>Static IP</label><input type="text" id="publicIp" placeholder="SmartAPI IP"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
-                <button class="btn" style="background:#555;color:#aaa;font-size:11px;padding:6px 10px;border-radius:6px" onclick="clearSavedData()">Clear Saved</button>
             </div>
         </div>
         <p class="helper-text" id="loginError"></p>

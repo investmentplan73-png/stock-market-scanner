@@ -108,33 +108,27 @@ const Config = {
     // Options scanner settings. Keep this practical for live Angel One data:
     // some quote fields such as option volume can be missing.
     optionScanner: {
-        minConfidence: 60,
-        minBuyScore: 55,
-        strongConfidence: 68,
+        minConfidence: 70,
+        minBuyScore: 76,
+        strongConfidence: 80,
         maxOptionRiskPercent: 30,
-        firstTargetRiskReward: 2.0,
-        secondTargetRiskReward: 3.0,
+        firstTargetRiskReward: 1.8,
+        secondTargetRiskReward: 2.8,
         maxSpreadPercent: 7,
         pivotBufferPercent: 0.24,
         supportResistanceBufferPercent: 0.28,
         showBestWatchWhenNoBuy: true,
-        minWatchScore: 50,
-        maxBuyWarnings: 5,
-        maxWatchWarnings: 8,
-        maxBuyPenalty: 35,
-        maxWatchPenalty: 50,
-        requireVwapConfirm: false,
-        requireStructureClear: false,
-        requirePivotConfirm: false,
-        minRewardRiskForBuy: 1.0,
-        spreadBufferPercent: 3,
+        minWatchScore: 62,
+        maxBuyWarnings: 2,
+        maxWatchWarnings: 3,
+        minRewardRiskForBuy: 1.25,
         stopLoss: {
-            confirmations: 1,
-            fallbackRiskPercent: 25,
-            minRiskPercent: 12,
-            optionSupportBufferPercent: 6,
-            supportBufferPercent: 0.12,
-            atrBufferMultiplier: 0.18
+            confirmations: 2, // FIX: Was 1, now 2 - need 2 touches to confirm SL
+            fallbackRiskPercent: 28, // FIX: Was 24, wider buffer
+            minRiskPercent: 18, // FIX: Was 14, wider minimum
+            optionSupportBufferPercent: 6, // FIX: Was 4, wider buffer
+            supportBufferPercent: 0.12, // FIX: Was 0.08, wider buffer
+            atrBufferMultiplier: 0.18 // FIX: Was 0.12, wider ATR buffer
         },
         breakout: {
             enabled: true,
@@ -194,30 +188,7 @@ const Config = {
             STOCK: 10,
             COMMODITY: 50
         },
-        autoRefreshSeconds: 20,
-        stockLotSizes: {
-            NIFTY: 25, BANKNIFTY: 15, FINNIFTY: 40, MIDCPNIFTY: 50, SENSEX: 15,
-            RELIANCE: 500, HDFCBANK: 550, ICICIBANK: 700, SBIN: 3000, AXISBANK: 625,
-            INFY: 425, TCS: 175, LT: 150, KOTAKBANK: 400, BHARTIARTL: 475,
-            ITC: 1600, TATAMOTORS: 2200, MARUTI: 5, SUNPHARMA: 400, TATASTEEL: 5500,
-            ADANIENT: 250, BAJFINANCE: 125, HINDUNILVR: 300, POWERGRID: 2700, NTPC: 4500,
-            WIPRO: 1500, TATACONSUM: 1000, HCLTECH: 350, TECHM: 600, DRREDDY: 125,
-            CIPLA: 325, APOLLOHOSP: 125, EICHERMOT: 250, BAJAJFINSV: 150, CoalIndia: 550,
-            INDUSINDBK: 900, GRASIM: 225, TATAPOWER: 2750, DIVISLAB: 100, ONGC: 3875,
-            BPCL: 1800, HINDALCO: 1625, NESTLEIND: 30, JSWSTEEL: 675, ULTRACEMCO: 50,
-            ASIANPAINT: 200, BHERO: 700, TRENT: 675, ADANIPORTS: 1250, BEL: 4500,
-            IRCTC: 1525, SBILIFE: 1125, HDFCLIFE: 1400, PIDILITIND: 400, PERSISTENT: 225,
-            COFORGE: 475, M&M: 425, MARICO: 1200, DABUR: 1500, COLPAL: 325,
-            GODREJCP: 650, BRITANNIA: 225, ICICIPRULI: 1700, HAVELLS: 625, VOLTAS: 425,
-            BATAINDIA: 550, DELHIVERY: 1325, PAYTM: 625, ZOMATO: 2375, NYKAA: 1550,
-            POLICYBZR: 350, LICI: 350, IOB: 10000, CANBK: 5000, PNB: 5000,
-            BANKBARODA: 5000, IDBI: 3000, FEDERALBNK: 10000, BANDHANBNK: 10000,
-            AUBANK: 1100, INDUSINDBK: 900, MOTHERSON: 3750, ZEEL: 5000, SAIL: 15000,
-            HINDZINC: 1000, NMDC: 5625, NATIONALUM: 5625, VEDL: 3000, JINDALSTEL: 2750,
-            TATACHEM: 1125, DEEPAKNTR: 225, NAVINFLUOR: 150, LALPATHLAB: 250,
-            MAXHEALTH: 350, DIXON: 125, VOLTAS: 425, CROMPTON: 1500, BDL: 475,
-            HAL: 100, COCHINSHIP: 175, MazagonDock: 250, GRSE: 400
-        }
+        autoRefreshSeconds: 20
     },
 
     // Optional stock-option scan input. Fill these from the Angel One instrument
@@ -253,7 +224,7 @@ const Config = {
         delayBetweenSymbolsMs: 800,
         maxStocksPerCycle: 60,
         maxCommoditiesPerCycle: 3,
-        includeWatchSignals: true,
+        includeWatchSignals: false,
         includeCommodityWatchSignals: true,
         useAllFnoStocks: true,
         includeCommodities: true,
@@ -338,6 +309,7 @@ const Config = {
             apiKey: this.apiKey,
             apiSecret: this.apiSecret,
             clientId: this.clientId,
+            totpSecret: this.totpSecret,
             publicIp: this.publicIp,
             accessToken: this.accessToken,
             refreshToken: this.refreshToken,

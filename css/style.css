@@ -372,42 +372,38 @@ body {
     border: 1px solid #303741;
     border-radius: 8px;
     display: grid;
-    gap: 6px;
-    margin-bottom: 10px;
-    padding: 10px 12px;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 16px;
 }
 
 .summary-title {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 700;
-    margin-bottom: 2px;
 }
 
 .summary-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 12px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .summary-metric {
     color: #aeb7c2;
-    font-size: 11px;
-    white-space: nowrap;
+    font-size: 12px;
 }
 
 .summary-metric strong {
     color: #f4f6f8;
-    display: inline;
-    font-size: 13px;
-    margin-left: 4px;
+    display: block;
+    font-size: 17px;
+    margin-top: 4px;
 }
 
 .summary-reasons {
     color: #cbd3dc;
-    font-size: 11px;
-    line-height: 1.4;
-    max-height: 2.8em;
-    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 .scan-status-grid {
@@ -466,9 +462,6 @@ body {
     color: #ff8c8c;
     font-weight: 600;
     margin-top: 16px;
-    white-space: pre-line;
-    font-size: 13px;
-    line-height: 1.5;
 }
 
 /* Options Table */
@@ -641,24 +634,20 @@ body {
 }
 
 .option-chain-section .summary-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
+    grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
 }
 
 .option-chain-section .summary-metric {
     background: #f5f8fc;
     border: 1px solid #e0e8f1;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #54708e;
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 12px;
 }
 
 .option-chain-section .summary-metric strong {
     color: #102038;
-    font-size: 13px;
-    margin-left: 3px;
+    font-size: 18px;
 }
 
 .option-chain-section .summary-reasons {
@@ -666,10 +655,7 @@ body {
     border-left: 4px solid #f2b93b;
     border-radius: 6px;
     color: #5b4930;
-    padding: 6px 10px;
-    font-size: 11px;
-    max-height: 2.8em;
-    overflow: hidden;
+    padding: 10px 12px;
 }
 
 .option-chain-section .table-toggle-row {

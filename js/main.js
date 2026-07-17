@@ -96,17 +96,12 @@ function loadSavedCredentials() {
 
     try {
         const config = JSON.parse(saved);
-        const badClientId = /^(admin|root|test|demo|user)$/i.test(String(config.clientId || '').trim());
         document.getElementById('apiKey').value = config.apiKey || '';
         document.getElementById('apiSecret').value = config.apiSecret || '';
-        document.getElementById('clientId').value = badClientId ? '' : (config.clientId || '');
-        document.getElementById('totpSecret').value = '';
+        document.getElementById('clientId').value = config.clientId || '';
+        document.getElementById('totpSecret').value = config.totpSecret || '';
         const publicIp = document.getElementById('publicIp');
         if (publicIp) publicIp.value = config.publicIp || '';
-        if (badClientId) {
-            Config.clientId = '';
-            Config.saveConfig();
-        }
     } catch (error) {
         console.warn('Could not load saved credentials', error);
     }
@@ -126,61 +121,6 @@ function checkExistingConnection() {
     setStatus('Disconnected', false);
 }
 
-function clearSavedData() {
-    localStorage.removeItem('stockMarketConfig');
-    document.getElementById('apiKey').value = '';
-    document.getElementById('apiSecret').value = '';
-    document.getElementById('clientId').value = '';
-    document.getElementById('totpSecret').value = '';
-    const publicIp = document.getElementById('publicIp');
-    if (publicIp) publicIp.value = '';
-    Config.apiKey = '';
-    Config.apiSecret = '';
-    Config.clientId = '';
-    Config.totpSecret = '';
-    Config.publicIp = '';
-    Config.accessToken = '';
-    Config.refreshToken = '';
-    Config.feedToken = '';
-    const loginError = document.getElementById('loginError');
-    if (loginError) loginError.textContent = 'Sab data clear ho gaya. Ab sahi credentials dalo.';
-}
-
-async function detectServerPublicIp() {
-    try {
-        const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(5000) });
-        const data = await res.json();
-        return data.ip || '';
-    } catch (e) {
-        try {
-            const res2 = await fetch('https://whatismyip.amazonaws.com', { signal: AbortSignal.timeout(5000) });
-            return (await res2.text()).trim();
-        } catch (e2) {
-            return '';
-        }
-    }
-}
-
-async function autoDetectMyIp() {
-    const field = document.getElementById('publicIp');
-    if (field) field.value = 'Detecting...';
-    try {
-        const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(8000) });
-        const data = await res.json();
-        if (data.ip) {
-            if (field) field.value = data.ip;
-            const loginError = document.getElementById('loginError');
-            if (loginError) loginError.textContent = `Tumhara IP: ${data.ip}\nYe IP Angel One SmartAPI dashboard → Profile → Primary IP me bhi save karo.`;
-        } else {
-            if (field) field.value = '';
-            alert('IP detect nahi ho paya. Manually whatismyipaddress.com se lo.');
-        }
-    } catch (e) {
-        if (field) field.value = '';
-        alert('IP detect nahi ho paya. Manually whatismyipaddress.com se lo.');
-    }
-}
-
 async function connectAPI() {
     const apiKey = document.getElementById('apiKey').value.trim();
     const apiSecret = document.getElementById('apiSecret').value.trim();
@@ -188,48 +128,18 @@ async function connectAPI() {
     const totpSecret = document.getElementById('totpSecret').value.trim();
     const publicIp = document.getElementById('publicIp')?.value.trim() || '';
     const loginError = document.getElementById('loginError');
-    if (loginError) {
-        loginError.textContent = '';
-        loginError.style.background = '';
-        loginError.style.border = '';
-        loginError.style.padding = '';
-    }
+    if (loginError) loginError.textContent = '';
 
     if (!apiKey || !apiSecret || !clientId) {
-        const missing = [];
-        if (!apiKey) missing.push('API Key');
-        if (!apiSecret) missing.push('Password');
-        if (!clientId) missing.push('Client ID');
-        const msg = `Ye fields khali hain: ${missing.join(', ')}\n\nYe sab tumhe Angel One SmartAPI dashboard se milta hai:\n1. smartapi.angelone.in pe login karo\n2. Developer → My Apps me jao\n3. API Key wahan milega\n4. Client ID tumhara Angel One login ID hai (jaise g53589)\n5. Password tumhara Angel One login password hai`;
-        if (loginError) loginError.textContent = msg;
-        alert(msg);
-        return;
-    }
-
-    if (clientId.toLowerCase() === 'admin' || clientId.toLowerCase() === 'root') {
-        const msg = '"admin" tumhara Angel One Client ID nahi hai!\n\nClient ID = tumhara Angel One account ka login ID.\nJab tum smartapi.angelone.in pe login karte ho to jo ID dikhti hai wo Client ID hai.\nFormat aisa hota hai: g53589';
-        if (loginError) loginError.textContent = msg;
-        alert(msg);
+        alert('Please enter API Key, API Secret / Password, and Client ID');
         return;
     }
 
     if (!/^\d{6}$/.test(totpSecret)) {
-        const msg = 'TOTP galat hai!\n\nTOTP = Google Authenticator app ka 6-digit code jo har 30 second badalta hai.\nYe QR secret key nahi hai — actual 6 digits jo screen pe dikhte hain wo dalo.';
-        if (loginError) loginError.textContent = msg;
-        alert(msg);
+        const message = 'TOTP must be the current 6-digit code from authenticator, not the QR secret key.';
+        if (loginError) loginError.textContent = message;
+        alert(message);
         return;
-    }
-
-    const isRemote = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    if (isRemote && !publicIp) {
-        detectServerPublicIp().then(ip => {
-            if (ip) {
-                const field = document.getElementById('publicIp');
-                if (field && !field.value.trim()) {
-                    field.placeholder = `Detected: ${ip} (verify at whatismyipaddress.com)`;
-                }
-            }
-        });
     }
 
     isDemoMode = false;
@@ -241,16 +151,6 @@ async function connectAPI() {
     Config.saveConfig();
 
     setStatus('Connecting...', false);
-
-    const loginDebug = [];
-    loginDebug.push(`API Key: ${apiKey ? apiKey.substring(0,4) + '...' : 'MISSING'}`);
-    loginDebug.push(`Client ID: ${clientId || 'MISSING'}`);
-    loginDebug.push(`Password: ${apiSecret ? apiSecret.length + ' chars' : 'MISSING'}`);
-    loginDebug.push(`TOTP: ${/^\d{6}$/.test(totpSecret) ? 'OK (6 digits)' : 'MISSING/INVALID'}`);
-    loginDebug.push(`Static IP: ${publicIp || 'MISSING'}`);
-    loginDebug.push(`Mode: ${isRemote ? 'Render/Cloud' : 'Local'}`);
-    AngelOneAPI.log(`Login attempt: ${loginDebug.join(', ')}`);
-
     const connected = await AngelOneAPI.init();
 
     if (connected) {
@@ -261,24 +161,7 @@ async function connectAPI() {
     } else {
         setStatus('Connection failed', false);
         if (loginError) {
-            const err = AngelOneAPI.lastError || 'Unknown error';
-            let msg = `Angel One Error: ${err}\n\n`;
-            if (isRemote && !publicIp) {
-                msg += 'Static IP khali hai! "Detect IP" button dabao ya manually whatismyipaddress.com se lo.\nPhir Angel One dashboard me bhi register karo.';
-            } else if (/ip|803|804/i.test(err)) {
-                msg += 'IP mismatch!\n1. "Detect IP" button se apna IP dalo\n2. Angel One dashboard → Profile → Primary IP me bhi wo IP save karo\n3. Phir Connect dabao';
-            } else if (/totp|otp|2fa|auth/i.test(err)) {
-                msg += 'TOTP galat hai ya expire ho gaya.\nGoogle Authenticator kholo → abhi ka naya 6-digit code dalo.';
-            } else if (/password|pwd|cred/i.test(err)) {
-                msg += 'Password galat hai.\nAngel One login password check karo.';
-            } else {
-                msg += 'Check karo: API Key, Password, Client ID, TOTP (naya code), Static IP.';
-            }
-            loginError.style.background = '#3a1515';
-            loginError.style.border = '1px solid #f44';
-            loginError.style.padding = '12px';
-            loginError.style.borderRadius = '8px';
-            loginError.textContent = msg;
+            loginError.textContent = AngelOneAPI.lastError || 'Connection failed. Check password, 6-digit TOTP, API key, client ID, and Primary Static IP.';
         }
     }
 }
@@ -854,22 +737,6 @@ async function updateIndicatorsForSymbol(symbol, token, timeframe, exchange = 'N
     );
 
     if (!historicalData || !historicalData.data || !historicalData.data.length) {
-        const spot = latestPricesBySymbol[symbol] || 0;
-        if (spot > 0) {
-            const drift = getFallbackDriftForSymbol(symbol);
-            const candles = buildDemoCandles(spot * 0.96, drift);
-            const lastCandle = candles.at(-1);
-            const adjustment = spot - Number(lastCandle?.[4] || spot);
-            candles.forEach(candle => {
-                candle[1] = Math.max(0.05, Number(candle[1]) + adjustment);
-                candle[2] = Math.max(candle[1], Number(candle[2]) + adjustment);
-                candle[3] = Math.max(0.05, Number(candle[3]) + adjustment);
-                candle[4] = Math.max(0.05, Number(candle[4]) + adjustment);
-            });
-            latestIndicatorsBySymbol[symbol] = calculateIndicatorsFromCandles(candles);
-            latestIndicatorTimesBySymbol[symbol] = Date.now();
-            return true;
-        }
         return false;
     }
     const indicators = calculateIndicatorsFromCandles(historicalData.data);
@@ -2342,18 +2209,24 @@ function renderOptionSummary(evaluation) {
     const orbGapBb = indicatorContext.ORBGapBBContext || {};
     if (!best) {
         summary.innerHTML = `
-            <div class="summary-title">NO TRADE - Not aligned</div>
+            <div class="summary-title">NO TRADE - ICT fractal/bias/structure/liquidity not aligned</div>
             <div class="summary-grid">
                 <div class="summary-metric">Spot<strong>${OptionSignalEngine.formatMoney(evaluation.spotPrice)}</strong></div>
                 <div class="summary-metric">ATM<strong>${evaluation.atmStrike}</strong></div>
-                <div class="summary-metric">Bias<strong>${evaluation.bias.direction}</strong></div>
-                <div class="summary-metric">Strength<strong>${evaluation.bias.strength}%</strong></div>
+                <div class="summary-metric">ICT Bias<strong>${evaluation.bias.direction}</strong></div>
+                <div class="summary-metric">ICT Strength<strong>${evaluation.bias.strength}%</strong></div>
+                <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
+                <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
                 <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-                <div class="summary-metric">Liq<strong>${formatIctValue(ict.liquidity)}</strong></div>
-                <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
-                <div class="summary-metric">ORB<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
+                <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
+                <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+                <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
+                <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
+                <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
+                <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
+                <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
             </div>
-            <div class="summary-reasons">Wait for alignment.</div>
+            <div class="summary-reasons">Wait for fractal bias, structure break, liquidity sweep, and displacement/FVG to align.</div>
         `;
         return;
     }
@@ -2363,15 +2236,22 @@ function renderOptionSummary(evaluation) {
         <div class="summary-grid">
             <div class="summary-metric">Confidence<strong>${best.score}%</strong></div>
             <div class="summary-metric">Entry<strong>${OptionSignalEngine.formatMoney(best.risk.entry)}</strong></div>
-            <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
-            <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
-            <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
-            <div class="summary-metric">Lot<strong>${formatOptionLotSize(best)}</strong></div>
-            <div class="summary-metric">Bias<strong>${best.bias.direction}</strong></div>
-            <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+            <div class="summary-metric">Stop Loss<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
+            <div class="summary-metric">Option Support<strong>${best.risk.optionSupport ? OptionSignalEngine.formatMoney(best.risk.optionSupport) : '--'}</strong></div>
+            <div class="summary-metric">Lot Size<strong>${formatOptionLotSize(best)}</strong></div>
+            <div class="summary-metric">Target 1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
+            <div class="summary-metric">Target 2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
+            <div class="summary-metric">ICT Bias<strong>${best.bias.direction}</strong></div>
+            <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
+            <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
             <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-            <div class="summary-metric">Liq<strong>${formatIctValue(ict.liquidity)}</strong></div>
-            <div class="summary-metric">ORB<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
+            <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
+            <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+            <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
+            <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
+            <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
+            <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
+            <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
         </div>
         <div class="summary-reasons">${[...best.reasons, ...best.warnings.map(item => `Caution: ${item}`)].join(' | ')}</div>
     `;
@@ -2561,12 +2441,7 @@ function getOptionLotSize(source = {}) {
         ?? source.option?.lotsize
         ?? 0
     );
-    if (Number.isFinite(lotSize) && lotSize > 0) return lotSize;
-    const symbol = source.symbol || source.option?.symbol || source.tradingSymbol || '';
-    const cleanSymbol = String(symbol).replace(/(CE|PE)$/i, '').replace(/\d+[A-Z]*\d+.*$/, '').trim();
-    const lookup = Config.optionScanner.stockLotSizes || {};
-    const matchedKey = Object.keys(lookup).find(key => cleanSymbol.includes(key));
-    return matchedKey ? lookup[matchedKey] : 0;
+    return Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 0;
 }
 
 function formatOptionLotSize(source = {}) {
@@ -3460,30 +3335,8 @@ async function getMarketScanTargets() {
                 expiryDate: getUpcomingExpiriesForSymbol(symbol, 1)[0] || selectedExpiryDate || ''
             }));
     }
-    if (isDemoMode && scope === 'STOCKS') {
-        return (Config.autoScanner.stockSymbols || [])
-            .slice(0, 20)
-            .map(symbol => ({
-                segment: 'STOCK',
-                symbol,
-                token: `DEMO-${symbol}`,
-                exchange: 'NSE',
-                expiryDate: getUpcomingStockOptionExpiries(1)[0] || selectedExpiryDate || ''
-            }));
-    }
-    if (isDemoMode && scope === 'INDICES') return indexTargets;
-    if (isDemoMode) {
-        const demoStocks = (Config.autoScanner.stockSymbols || [])
-            .slice(0, 20)
-            .map(symbol => ({
-                segment: 'STOCK',
-                symbol,
-                token: `DEMO-${symbol}`,
-                exchange: 'NSE',
-                expiryDate: getUpcomingStockOptionExpiries(1)[0] || selectedExpiryDate || ''
-            }));
-        return [...indexTargets, ...demoStocks];
-    }
+    if (isDemoMode && scope === 'STOCKS') return [];
+    if (isDemoMode || scope === 'INDICES') return indexTargets;
     if (scope === 'COMMODITIES') return getAutoCommodityTargets();
     if (scope === 'STOCKS') return getAutoStockTargets();
 
@@ -3711,18 +3564,17 @@ async function scanAutoTarget(target) {
     }
 
     const timeframe = document.getElementById('timeframeSelector')?.value || 'FIVE_MINUTE';
+    const hasIndicators = await ensureAutoIndicators(target, timeframe);
+    if (!hasIndicators) {
+        recordAutoScanSkip(target, formatIndicatorUnavailableReason(target, timeframe));
+        return null;
+    }
 
     const spot = await getAutoSpotPrice(target);
     if (!spot) {
         const reason = 'spot price not available';
         AngelOneAPI.log(`Auto scanner skipped ${target.symbol}: ${reason}.`);
         recordAutoScanSkip(target, reason);
-        return null;
-    }
-
-    const hasIndicators = await ensureAutoIndicators(target, timeframe);
-    if (!hasIndicators) {
-        recordAutoScanSkip(target, formatIndicatorUnavailableReason(target, timeframe));
         return null;
     }
 
@@ -3784,21 +3636,6 @@ async function ensureAutoIndicators(target, timeframe) {
     }
 
     if (isDemoMode) {
-        if (latestIndicatorsBySymbol[target.symbol]) return true;
-        const spot = latestPricesBySymbol[target.symbol] || 0;
-        if (!spot) return false;
-        const drift = getFallbackDriftForSymbol(target.symbol);
-        const candles = buildDemoCandles(spot * 0.96, drift);
-        const lastCandle = candles.at(-1);
-        const adjustment = spot - Number(lastCandle?.[4] || spot);
-        candles.forEach(candle => {
-            candle[1] = Math.max(0.05, Number(candle[1]) + adjustment);
-            candle[2] = Math.max(candle[1], Number(candle[2]) + adjustment);
-            candle[3] = Math.max(0.05, Number(candle[3]) + adjustment);
-            candle[4] = Math.max(0.05, Number(candle[4]) + adjustment);
-        });
-        latestIndicatorsBySymbol[target.symbol] = calculateIndicatorsFromCandles(candles);
-        latestIndicatorTimesBySymbol[target.symbol] = Date.now();
         return Boolean(latestIndicatorsBySymbol[target.symbol]);
     }
 
@@ -3876,20 +3713,7 @@ function shouldShowCommodityWatchSignal(signal, target) {
 }
 
 async function getAutoSpotPrice(target) {
-    if (isDemoMode) {
-        if (latestPricesBySymbol[target.symbol]) return latestPricesBySymbol[target.symbol];
-        const demoStockPrices = {
-            RELIANCE: 1420, HDFCBANK: 1680, ICICIBANK: 1280, SBIN: 810,
-            AXISBANK: 1150, INFY: 1520, TCS: 3750, LT: 3650,
-            KOTAKBANK: 1850, BHARTIARTL: 1560, ITC: 460, TATAMOTORS: 980,
-            MARUTI: 12500, SUNPHARMA: 1780, TATASTEEL: 165, ADANIENT: 2350,
-            BAJFINANCE: 7200, HINDUNILVR: 2450, POWERGRID: 310, NTPC: 360,
-            NIFTY: 25200, BANKNIFTY: 56400, SENSEX: 83200
-        };
-        const price = demoStockPrices[target.symbol] || latestPricesBySymbol.NIFTY || 25000;
-        latestPricesBySymbol[target.symbol] = price;
-        return price;
-    }
+    if (isDemoMode) return latestPricesBySymbol[target.symbol] || latestPricesBySymbol.NIFTY || 0;
 
     const response = await AngelOneAPI.getLTP({ [target.exchange || 'NSE']: [target.token] });
     const rows = response?.data || [];
@@ -4471,22 +4295,19 @@ function buildDemoOptionsChain(symbol, spot) {
         const timeValue = Math.max(18, 140 - Math.abs(i) * 13);
         const trendBoost = latestIndicatorsBySymbol[symbol]?.EMA?.short > latestIndicatorsBySymbol[symbol]?.EMA?.long ? 12 : -8;
 
-        const lotSize = Config.optionScanner.stockLotSizes[symbol] || 1;
         calls[strike] = {
             ltp: Math.max(1, callIntrinsic + timeValue + trendBoost),
             change: i <= 2 ? 7 + trendBoost * 0.2 : -3,
             volume: 5000 - Math.abs(i) * 220,
             bid: Math.max(1, callIntrinsic + timeValue + trendBoost - 1.8),
-            ask: Math.max(1, callIntrinsic + timeValue + trendBoost + 2.2),
-            lotSize
+            ask: Math.max(1, callIntrinsic + timeValue + trendBoost + 2.2)
         };
         puts[strike] = {
             ltp: Math.max(1, putIntrinsic + timeValue - trendBoost),
             change: i >= -2 ? -4 - trendBoost * 0.15 : 5,
             volume: 4700 - Math.abs(i) * 240,
             bid: Math.max(1, putIntrinsic + timeValue - trendBoost - 2.1),
-            ask: Math.max(1, putIntrinsic + timeValue - trendBoost + 2.4),
-            lotSize
+            ask: Math.max(1, putIntrinsic + timeValue - trendBoost + 2.4)
         };
     }
 
