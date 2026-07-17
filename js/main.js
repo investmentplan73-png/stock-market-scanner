@@ -142,6 +142,14 @@ async function connectAPI() {
         return;
     }
 
+    const isRemote = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    if (isRemote && !publicIp) {
+        const ipHint = 'On Render/cloud, you MUST enter your SmartAPI registered Static IP. Go to Angel One SmartAPI dashboard → Profile → Your Primary IP. Fill it in the Static IP field above.';
+        if (loginError) loginError.textContent = ipHint;
+        alert(ipHint);
+        return;
+    }
+
     isDemoMode = false;
     Config.apiKey = apiKey;
     Config.apiSecret = apiSecret;
@@ -161,7 +169,14 @@ async function connectAPI() {
     } else {
         setStatus('Connection failed', false);
         if (loginError) {
-            loginError.textContent = AngelOneAPI.lastError || 'Connection failed. Check password, 6-digit TOTP, API key, client ID, and Primary Static IP.';
+            const err = AngelOneAPI.lastError || '';
+            let hint = 'Connection failed. Check password, 6-digit TOTP, API key, and Client ID.';
+            if (isRemote && !publicIp) {
+                hint += ' Also enter your SmartAPI Static IP.';
+            } else if (err.toLowerCase().includes('ip') || err.includes('803') || err.includes('804')) {
+                hint = 'IP mismatch! Enter your SmartAPI registered Primary Static IP in the field above. Go to Angel One SmartAPI dashboard → Profile → Your IP.';
+            }
+            loginError.textContent = err ? `${err}\n${hint}` : hint;
         }
     }
 }

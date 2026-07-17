@@ -466,6 +466,9 @@ body {
     color: #ff8c8c;
     font-weight: 600;
     margin-top: 16px;
+    white-space: pre-line;
+    font-size: 13px;
+    line-height: 1.5;
 }
 
 /* Options Table */
