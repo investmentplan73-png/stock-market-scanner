@@ -167,12 +167,13 @@
 
     <div class="config-panel" id="configPanel">
         <h2>Angel One API</h2>
+        <p class="helper-text" style="margin-bottom:12px; color:#6cc; font-size:13px;">Ye sab Angel One SmartAPI dashboard se milta hai: <a href="https://smartapi.angelone.in" target="_blank" style="color:#6cf;">smartapi.angelone.in</a> → Developer → My Apps</p>
         <div class="config-form">
-            <div class="form-group"><label>API Key</label><input type="text" id="apiKey" placeholder="API key"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="apiSecret" placeholder="Password"></div>
-            <div class="form-group"><label>Client ID</label><input type="text" id="clientId" placeholder="Client ID"></div>
-            <div class="form-group"><label>TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP"></div>
-            <div class="form-group"><label>Static IP</label><input type="text" id="publicIp" placeholder="SmartAPI IP"></div>
+            <div class="form-group"><label>API Key <span style="color:#f88">*</span></label><input type="text" id="apiKey" placeholder="jaise: aBcDeFgHiJkLmNoPqRsTuVw"></div>
+            <div class="form-group"><label>Password <span style="color:#f88">*</span></label><input type="password" id="apiSecret" placeholder="Angel One login password"></div>
+            <div class="form-group"><label>Client ID <span style="color:#f88">*</span></label><input type="text" id="clientId" placeholder="jaise: g53589 (Login ke baad dikhta hai)"></div>
+            <div class="form-group"><label>TOTP <span style="color:#f88">*</span></label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="Google Authenticator ka 6-digit code"></div>
+            <div class="form-group"><label>Static IP <span style="color:#f88">*</span></label><input type="text" id="publicIp" placeholder="Apna public IP — whatismyipaddress.com se lo"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>

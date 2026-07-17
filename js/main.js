@@ -146,14 +146,20 @@ async function connectAPI() {
     if (loginError) loginError.textContent = '';
 
     if (!apiKey || !apiSecret || !clientId) {
-        alert('Please enter API Key, API Secret / Password, and Client ID');
+        const missing = [];
+        if (!apiKey) missing.push('API Key');
+        if (!apiSecret) missing.push('Password');
+        if (!clientId) missing.push('Client ID');
+        const msg = `Ye fields khali hain: ${missing.join(', ')}\n\nYe sab tumhe Angel One SmartAPI dashboard se milta hai:\n1. smartapi.angelone.in pe login karo\n2. Developer → My Apps me jao\n3. API Key wahan milega\n4. Client ID tumhara Angel One login ID hai (jaise g53589)\n5. Password tumhara Angel One login password hai`;
+        if (loginError) loginError.textContent = msg;
+        alert(msg);
         return;
     }
 
     if (!/^\d{6}$/.test(totpSecret)) {
-        const message = 'TOTP must be the current 6-digit code from authenticator, not the QR secret key.';
-        if (loginError) loginError.textContent = message;
-        alert(message);
+        const msg = 'TOTP galat hai!\n\nTOTP = Google Authenticator app ka 6-digit code jo har 30 second badalta hai.\nYe QR secret key nahi hai — actual 6 digits jo screen pe dikhte hain wo dalo.';
+        if (loginError) loginError.textContent = msg;
+        alert(msg);
         return;
     }
 
