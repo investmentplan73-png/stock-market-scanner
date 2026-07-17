@@ -161,6 +161,26 @@ async function detectServerPublicIp() {
     }
 }
 
+async function autoDetectMyIp() {
+    const field = document.getElementById('publicIp');
+    if (field) field.value = 'Detecting...';
+    try {
+        const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (data.ip) {
+            if (field) field.value = data.ip;
+            const loginError = document.getElementById('loginError');
+            if (loginError) loginError.textContent = `Tumhara IP: ${data.ip}\nYe IP Angel One SmartAPI dashboard → Profile → Primary IP me bhi save karo.`;
+        } else {
+            if (field) field.value = '';
+            alert('IP detect nahi ho paya. Manually whatismyipaddress.com se lo.');
+        }
+    } catch (e) {
+        if (field) field.value = '';
+        alert('IP detect nahi ho paya. Manually whatismyipaddress.com se lo.');
+    }
+}
+
 async function connectAPI() {
     const apiKey = document.getElementById('apiKey').value.trim();
     const apiSecret = document.getElementById('apiSecret').value.trim();
@@ -168,7 +188,12 @@ async function connectAPI() {
     const totpSecret = document.getElementById('totpSecret').value.trim();
     const publicIp = document.getElementById('publicIp')?.value.trim() || '';
     const loginError = document.getElementById('loginError');
-    if (loginError) loginError.textContent = '';
+    if (loginError) {
+        loginError.textContent = '';
+        loginError.style.background = '';
+        loginError.style.border = '';
+        loginError.style.padding = '';
+    }
 
     if (!apiKey || !apiSecret || !clientId) {
         const missing = [];
@@ -216,6 +241,16 @@ async function connectAPI() {
     Config.saveConfig();
 
     setStatus('Connecting...', false);
+
+    const loginDebug = [];
+    loginDebug.push(`API Key: ${apiKey ? apiKey.substring(0,4) + '...' : 'MISSING'}`);
+    loginDebug.push(`Client ID: ${clientId || 'MISSING'}`);
+    loginDebug.push(`Password: ${apiSecret ? apiSecret.length + ' chars' : 'MISSING'}`);
+    loginDebug.push(`TOTP: ${/^\d{6}$/.test(totpSecret) ? 'OK (6 digits)' : 'MISSING/INVALID'}`);
+    loginDebug.push(`Static IP: ${publicIp || 'MISSING'}`);
+    loginDebug.push(`Mode: ${isRemote ? 'Render/Cloud' : 'Local'}`);
+    AngelOneAPI.log(`Login attempt: ${loginDebug.join(', ')}`);
+
     const connected = await AngelOneAPI.init();
 
     if (connected) {
@@ -226,14 +261,24 @@ async function connectAPI() {
     } else {
         setStatus('Connection failed', false);
         if (loginError) {
-            const err = AngelOneAPI.lastError || '';
-            let hint = 'Check password, 6-digit TOTP (current code, not secret), API key, and Client ID.';
+            const err = AngelOneAPI.lastError || 'Unknown error';
+            let msg = `Angel One Error: ${err}\n\n`;
             if (isRemote && !publicIp) {
-                hint += '\n\nRender pe ho — Static IP bhi chahiye.\n1. https://whatismyipaddress.com pe jaao\n2. Jo IP dikhe wo copy karo\n3. Static IP field me daalo\n4. Angel One dashboard me bhi wo IP register karo (Profile → Primary IP)\n5. Phir Connect dabao.';
-            } else if (err.includes('IP') || err.includes('ip') || err.includes('803') || err.includes('804')) {
-                hint = 'Angel One IP mismatch!\n1. Apna public IP check karo: https://whatismyipaddress.com\n2. Wo IP Static IP field me daalo\n3. Angel One SmartAPI dashboard → Profile → Primary IP me bhi wo IP daalo\n4. Phir Connect dabao.';
+                msg += 'Static IP khali hai! "Detect IP" button dabao ya manually whatismyipaddress.com se lo.\nPhir Angel One dashboard me bhi register karo.';
+            } else if (/ip|803|804/i.test(err)) {
+                msg += 'IP mismatch!\n1. "Detect IP" button se apna IP dalo\n2. Angel One dashboard → Profile → Primary IP me bhi wo IP save karo\n3. Phir Connect dabao';
+            } else if (/totp|otp|2fa|auth/i.test(err)) {
+                msg += 'TOTP galat hai ya expire ho gaya.\nGoogle Authenticator kholo → abhi ka naya 6-digit code dalo.';
+            } else if (/password|pwd|cred/i.test(err)) {
+                msg += 'Password galat hai.\nAngel One login password check karo.';
+            } else {
+                msg += 'Check karo: API Key, Password, Client ID, TOTP (naya code), Static IP.';
             }
-            loginError.textContent = err ? `${err}\n\n${hint}` : hint;
+            loginError.style.background = '#3a1515';
+            loginError.style.border = '1px solid #f44';
+            loginError.style.padding = '12px';
+            loginError.style.borderRadius = '8px';
+            loginError.textContent = msg;
         }
     }
 }
