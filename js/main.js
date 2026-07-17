@@ -121,6 +121,21 @@ function checkExistingConnection() {
     setStatus('Disconnected', false);
 }
 
+async function detectServerPublicIp() {
+    try {
+        const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+        return data.ip || '';
+    } catch (e) {
+        try {
+            const res2 = await fetch('https://whatismyip.amazonaws.com', { signal: AbortSignal.timeout(5000) });
+            return (await res2.text()).trim();
+        } catch (e2) {
+            return '';
+        }
+    }
+}
+
 async function connectAPI() {
     const apiKey = document.getElementById('apiKey').value.trim();
     const apiSecret = document.getElementById('apiSecret').value.trim();
@@ -144,10 +159,14 @@ async function connectAPI() {
 
     const isRemote = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
     if (isRemote && !publicIp) {
-        const ipHint = 'On Render/cloud, you MUST enter your SmartAPI registered Static IP. Go to Angel One SmartAPI dashboard → Profile → Your Primary IP. Fill it in the Static IP field above.';
-        if (loginError) loginError.textContent = ipHint;
-        alert(ipHint);
-        return;
+        detectServerPublicIp().then(ip => {
+            if (ip) {
+                const field = document.getElementById('publicIp');
+                if (field && !field.value.trim()) {
+                    field.placeholder = `Detected: ${ip} (verify at whatismyipaddress.com)`;
+                }
+            }
+        });
     }
 
     isDemoMode = false;
@@ -170,13 +189,13 @@ async function connectAPI() {
         setStatus('Connection failed', false);
         if (loginError) {
             const err = AngelOneAPI.lastError || '';
-            let hint = 'Connection failed. Check password, 6-digit TOTP, API key, and Client ID.';
+            let hint = 'Check password, 6-digit TOTP (current code, not secret), API key, and Client ID.';
             if (isRemote && !publicIp) {
-                hint += ' Also enter your SmartAPI Static IP.';
-            } else if (err.toLowerCase().includes('ip') || err.includes('803') || err.includes('804')) {
-                hint = 'IP mismatch! Enter your SmartAPI registered Primary Static IP in the field above. Go to Angel One SmartAPI dashboard → Profile → Your IP.';
+                hint += '\n\nRender pe ho — Static IP bhi chahiye.\n1. https://whatismyipaddress.com pe jaao\n2. Jo IP dikhe wo copy karo\n3. Static IP field me daalo\n4. Angel One dashboard me bhi wo IP register karo (Profile → Primary IP)\n5. Phir Connect dabao.';
+            } else if (err.includes('IP') || err.includes('ip') || err.includes('803') || err.includes('804')) {
+                hint = 'Angel One IP mismatch!\n1. Apna public IP check karo: https://whatismyipaddress.com\n2. Wo IP Static IP field me daalo\n3. Angel One SmartAPI dashboard → Profile → Primary IP me bhi wo IP daalo\n4. Phir Connect dabao.';
             }
-            loginError.textContent = err ? `${err}\n${hint}` : hint;
+            loginError.textContent = err ? `${err}\n\n${hint}` : hint;
         }
     }
 }
