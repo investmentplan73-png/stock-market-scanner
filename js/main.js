@@ -2209,24 +2209,18 @@ function renderOptionSummary(evaluation) {
     const orbGapBb = indicatorContext.ORBGapBBContext || {};
     if (!best) {
         summary.innerHTML = `
-            <div class="summary-title">NO TRADE - ICT fractal/bias/structure/liquidity not aligned</div>
+            <div class="summary-title">NO TRADE - Not aligned</div>
             <div class="summary-grid">
                 <div class="summary-metric">Spot<strong>${OptionSignalEngine.formatMoney(evaluation.spotPrice)}</strong></div>
                 <div class="summary-metric">ATM<strong>${evaluation.atmStrike}</strong></div>
-                <div class="summary-metric">ICT Bias<strong>${evaluation.bias.direction}</strong></div>
-                <div class="summary-metric">ICT Strength<strong>${evaluation.bias.strength}%</strong></div>
-                <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
-                <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
+                <div class="summary-metric">Bias<strong>${evaluation.bias.direction}</strong></div>
+                <div class="summary-metric">Strength<strong>${evaluation.bias.strength}%</strong></div>
                 <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-                <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
-                <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
-                <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
-                <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
-                <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
-                <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
-                <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
+                <div class="summary-metric">Liq<strong>${formatIctValue(ict.liquidity)}</strong></div>
+                <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+                <div class="summary-metric">ORB<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
             </div>
-            <div class="summary-reasons">Wait for fractal bias, structure break, liquidity sweep, and displacement/FVG to align.</div>
+            <div class="summary-reasons">Wait for alignment.</div>
         `;
         return;
     }
@@ -2236,22 +2230,15 @@ function renderOptionSummary(evaluation) {
         <div class="summary-grid">
             <div class="summary-metric">Confidence<strong>${best.score}%</strong></div>
             <div class="summary-metric">Entry<strong>${OptionSignalEngine.formatMoney(best.risk.entry)}</strong></div>
-            <div class="summary-metric">Stop Loss<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
-            <div class="summary-metric">Option Support<strong>${best.risk.optionSupport ? OptionSignalEngine.formatMoney(best.risk.optionSupport) : '--'}</strong></div>
-            <div class="summary-metric">Lot Size<strong>${formatOptionLotSize(best)}</strong></div>
-            <div class="summary-metric">Target 1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
-            <div class="summary-metric">Target 2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
-            <div class="summary-metric">ICT Bias<strong>${best.bias.direction}</strong></div>
-            <div class="summary-metric">Liquidity<strong>${formatIctValue(ict.liquidity)}</strong></div>
-            <div class="summary-metric">Displacement<strong>${formatIctValue(ict.displacement)}</strong></div>
+            <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
+            <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
+            <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
+            <div class="summary-metric">Lot<strong>${formatOptionLotSize(best)}</strong></div>
+            <div class="summary-metric">Bias<strong>${best.bias.direction}</strong></div>
+            <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
             <div class="summary-metric">FVG<strong>${formatIctValue(ict.fvg)}</strong></div>
-            <div class="summary-metric">STH/STL<strong>${formatIctSwingSummary(ict)}</strong></div>
-            <div class="summary-metric">ICT MTF<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
-            <div class="summary-metric">ICT POI<strong>${formatAdvancedIctPoi(advancedIct.activePoi)}</strong></div>
-            <div class="summary-metric">ICT Trap<strong>${formatIctValue(advancedIct.trap?.type)}</strong></div>
-            <div class="summary-metric">ORB/Gap<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
-            <div class="summary-metric">BB Trap<strong>${formatOrbValue(orbGapBb.bbTrap?.type)}</strong></div>
-            <div class="summary-metric">Trap Boom<strong>${formatOrbValue(orbGapBb.trapBoom?.type)}</strong></div>
+            <div class="summary-metric">Liq<strong>${formatIctValue(ict.liquidity)}</strong></div>
+            <div class="summary-metric">ORB<strong>${formatOrbGapSummary(orbGapBb)}</strong></div>
         </div>
         <div class="summary-reasons">${[...best.reasons, ...best.warnings.map(item => `Caution: ${item}`)].join(' | ')}</div>
     `;
@@ -3335,8 +3322,30 @@ async function getMarketScanTargets() {
                 expiryDate: getUpcomingExpiriesForSymbol(symbol, 1)[0] || selectedExpiryDate || ''
             }));
     }
-    if (isDemoMode && scope === 'STOCKS') return [];
-    if (isDemoMode || scope === 'INDICES') return indexTargets;
+    if (isDemoMode && scope === 'STOCKS') {
+        return (Config.autoScanner.stockSymbols || [])
+            .slice(0, 20)
+            .map(symbol => ({
+                segment: 'STOCK',
+                symbol,
+                token: `DEMO-${symbol}`,
+                exchange: 'NSE',
+                expiryDate: getUpcomingStockOptionExpiries(1)[0] || selectedExpiryDate || ''
+            }));
+    }
+    if (isDemoMode && scope === 'INDICES') return indexTargets;
+    if (isDemoMode) {
+        const demoStocks = (Config.autoScanner.stockSymbols || [])
+            .slice(0, 20)
+            .map(symbol => ({
+                segment: 'STOCK',
+                symbol,
+                token: `DEMO-${symbol}`,
+                exchange: 'NSE',
+                expiryDate: getUpcomingStockOptionExpiries(1)[0] || selectedExpiryDate || ''
+            }));
+        return [...indexTargets, ...demoStocks];
+    }
     if (scope === 'COMMODITIES') return getAutoCommodityTargets();
     if (scope === 'STOCKS') return getAutoStockTargets();
 
@@ -3636,6 +3645,21 @@ async function ensureAutoIndicators(target, timeframe) {
     }
 
     if (isDemoMode) {
+        if (latestIndicatorsBySymbol[target.symbol]) return true;
+        const spot = latestPricesBySymbol[target.symbol] || 0;
+        if (!spot) return false;
+        const drift = getFallbackDriftForSymbol(target.symbol);
+        const candles = buildDemoCandles(spot * 0.96, drift);
+        const lastCandle = candles.at(-1);
+        const adjustment = spot - Number(lastCandle?.[4] || spot);
+        candles.forEach(candle => {
+            candle[1] = Math.max(0.05, Number(candle[1]) + adjustment);
+            candle[2] = Math.max(candle[1], Number(candle[2]) + adjustment);
+            candle[3] = Math.max(0.05, Number(candle[3]) + adjustment);
+            candle[4] = Math.max(0.05, Number(candle[4]) + adjustment);
+        });
+        latestIndicatorsBySymbol[target.symbol] = calculateIndicatorsFromCandles(candles);
+        latestIndicatorTimesBySymbol[target.symbol] = Date.now();
         return Boolean(latestIndicatorsBySymbol[target.symbol]);
     }
 
@@ -3713,7 +3737,20 @@ function shouldShowCommodityWatchSignal(signal, target) {
 }
 
 async function getAutoSpotPrice(target) {
-    if (isDemoMode) return latestPricesBySymbol[target.symbol] || latestPricesBySymbol.NIFTY || 0;
+    if (isDemoMode) {
+        if (latestPricesBySymbol[target.symbol]) return latestPricesBySymbol[target.symbol];
+        const demoStockPrices = {
+            RELIANCE: 1420, HDFCBANK: 1680, ICICIBANK: 1280, SBIN: 810,
+            AXISBANK: 1150, INFY: 1520, TCS: 3750, LT: 3650,
+            KOTAKBANK: 1850, BHARTIARTL: 1560, ITC: 460, TATAMOTORS: 980,
+            MARUTI: 12500, SUNPHARMA: 1780, TATASTEEL: 165, ADANIENT: 2350,
+            BAJFINANCE: 7200, HINDUNILVR: 2450, POWERGRID: 310, NTPC: 360,
+            NIFTY: 25200, BANKNIFTY: 56400, SENSEX: 83200
+        };
+        const price = demoStockPrices[target.symbol] || latestPricesBySymbol.NIFTY || 25000;
+        latestPricesBySymbol[target.symbol] = price;
+        return price;
+    }
 
     const response = await AngelOneAPI.getLTP({ [target.exchange || 'NSE']: [target.token] });
     const rows = response?.data || [];
