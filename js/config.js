@@ -279,7 +279,7 @@ const Config = {
         scanIntervalSeconds: 30,
         indicatorRefreshSeconds: 180,
         delayBetweenSymbolsMs: 800,
-        maxStocksPerCycle: 60,
+        maxStocksPerCycle: 100,
         maxCommoditiesPerCycle: 3,
         includeWatchSignals: false,
         includeCommodityWatchSignals: true,
