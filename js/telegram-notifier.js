@@ -70,7 +70,6 @@ const TelegramNotifier = {
         const v = String(value || '').trim().toLowerCase();
         return v === '@stockoptionniftycalls' || v === 'stockoptionniftycalls';
     },
-    },
 
     saveFromForm: function() {
         const enabled = document.getElementById('telegramEnabled');
