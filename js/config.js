@@ -369,8 +369,12 @@ const Config = {
                 ...this.tradeLock,
                 ...(config.tradeLock || {})
             };
-            if (!this.telegram.chatId && this.telegram.defaultChatId) {
-                this.telegram.chatId = this.telegram.defaultChatId;
+            // Remove any old hardcoded channel defaults
+            if (this.telegram.chatId && /stockoptionniftycalls/i.test(this.telegram.chatId)) {
+                this.telegram.chatId = '';
+            }
+            if (this.telegram.defaultChatId && /stockoptionniftycalls/i.test(this.telegram.defaultChatId)) {
+                this.telegram.defaultChatId = '';
             }
         }
     },

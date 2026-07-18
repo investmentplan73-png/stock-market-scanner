@@ -241,14 +241,15 @@
             <div class="section-body collapsed">
                 <div class="options-selector">
                     <label class="checkbox-label"><input type="checkbox" id="telegramEnabled" onchange="TelegramNotifier.saveFromForm()"> Enable</label>
-                    <label>Bot Token<input type="password" id="telegramBotToken" placeholder="Token" onblur="TelegramNotifier.saveFromForm()"></label>
-                    <label>Chat ID<input type="text" id="telegramChatId" placeholder="Chat ID" onblur="TelegramNotifier.saveFromForm()"></label>
-                    <label>Bot 2<input type="password" id="telegramBotToken2" placeholder="Optional" onblur="TelegramNotifier.saveFromForm()"></label>
-                    <label>Chat 2<input type="text" id="telegramChatId2" placeholder="Optional" onblur="TelegramNotifier.saveFromForm()"></label>
-                    <label>Relay URL<input type="url" id="telegramRelayUrl" placeholder="Relay" onblur="TelegramNotifier.saveFromForm()"></label>
-                    <label>Min Score<input type="number" id="telegramMinScore" min="60" max="100" value="70" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Bot Token<input type="text" id="telegramBotToken" placeholder="123456:ABCdefGhIJK..." onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Chat ID<input type="text" id="telegramChatId" placeholder="-1001234567890" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Bot 2 (Optional)<input type="text" id="telegramBotToken2" placeholder="Second bot token" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Chat 2 (Optional)<input type="text" id="telegramChatId2" placeholder="Second chat ID" onblur="TelegramNotifier.saveFromForm()"></label>
+                    <label>Min Score<input type="number" id="telegramMinScore" min="60" max="100" value="76" onblur="TelegramNotifier.saveFromForm()"></label>
                     <div class="button-row"><button class="btn btn-small" onclick="TelegramNotifier.resetSentSignals()">Reset</button><button class="btn btn-small" onclick="TelegramNotifier.sendTest()">Test</button></div>
                 </div>
+                <p class="helper-text">Get Bot Token from @BotFather. Get Chat ID by messaging your bot and visiting https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</p>
+                <input type="hidden" id="telegramRelayUrl" value="">
             </div>
         </section>
 

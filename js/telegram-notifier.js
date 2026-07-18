@@ -44,16 +44,32 @@ const TelegramNotifier = {
         const chatId2 = document.getElementById('telegramChatId2');
         const relayUrl = document.getElementById('telegramRelayUrl');
         const minScore = document.getElementById('telegramMinScore');
-        const chatDestination = this.normalizeChatDestination(Config.telegram.chatId || Config.telegram.defaultChatId || '');
-        const chatDestination2 = this.normalizeChatDestination(Config.telegram.chatId2 || '');
+
+        // Clean up old hardcoded channel values
+        const rawChatId = String(Config.telegram.chatId || '').trim();
+        const cleanChatId = this.isOldDefaultChannel(rawChatId) ? '' : rawChatId;
+        const rawChatId2 = String(Config.telegram.chatId2 || '').trim();
 
         if (enabled) enabled.checked = Boolean(Config.telegram.enabled);
         if (token) token.value = Config.telegram.botToken || '';
         if (token2) token2.value = Config.telegram.botToken2 || '';
-        if (chatId) chatId.value = chatDestination;
-        if (chatId2) chatId2.value = chatDestination2;
-        if (relayUrl) relayUrl.value = Config.telegram.relayUrl || '';
-        if (minScore) minScore.value = Config.telegram.minAlertScore || 70;
+        if (chatId) chatId.value = cleanChatId;
+        if (chatId2) chatId2.value = rawChatId2;
+        if (relayUrl) relayUrl.value = '';
+        if (minScore) minScore.value = Config.telegram.minAlertScore || 76;
+
+        // If old default channel was found, clear it from config too
+        if (this.isOldDefaultChannel(rawChatId)) {
+            Config.telegram.chatId = '';
+            Config.telegram.defaultChatId = '';
+            Config.saveConfig();
+        }
+    },
+
+    isOldDefaultChannel: function(value) {
+        const v = String(value || '').trim().toLowerCase();
+        return v === '@stockoptionniftycalls' || v === 'stockoptionniftycalls';
+    },
     },
 
     saveFromForm: function() {
