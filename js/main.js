@@ -3822,12 +3822,143 @@ async function runMarketWideScan(force = false) {
         renderMarketScanResults(foundSignals, scannedCount);
         updateMarketScannerStatus(getMarketScanStatusSummary(foundSignals.length, scannedCount));
         updateText('marketScanLastRun', new Date().toLocaleTimeString());
+
+        // === BTST BACKGROUND SCAN (higher timeframes) ===
+        // Runs after normal intraday scan, checks 1hr+Daily for BTST setups
+        await runBtstBackgroundScan(targets);
+
     } catch (error) {
         updateMarketScannerStatus(`Scan error: ${error.message}`);
         AngelOneAPI.log(`Auto scanner error: ${error.message}`);
     } finally {
         autoScanState.running = false;
         autoScanState.startedAt = 0;
+    }
+}
+
+// === BTST BACKGROUND SCAN ===
+// Runs after normal intraday scan. Checks 1hr + Daily timeframe for BTST setups.
+// Only fires BTST call when higher TF trend is strong + confirmed.
+let lastBtstScanAt = 0;
+const BTST_SCAN_COOLDOWN = 300000; // 5 minutes between BTST scans
+
+async function runBtstBackgroundScan(targets) {
+    // Only run BTST scan every 5 minutes (not every intraday cycle)
+    if (Date.now() - lastBtstScanAt < BTST_SCAN_COOLDOWN) return;
+    lastBtstScanAt = Date.now();
+
+    const swingSettings = Config.optionScanner.swing || {};
+    if (swingSettings.enabled === false) return;
+
+    const btstTimeframes = ['ONE_HOUR', 'ONE_DAY'];
+    const minConfidence = Number(swingSettings.minConfidence || 78);
+    const minSynergyScore = Number(swingSettings.minFischerSynergyScore || 50);
+
+    for (const target of (targets || [])) {
+        try {
+            if (!isMarketOpenForSegment(target.segment)) continue;
+
+            // Check if BTST signal already exists for this symbol
+            const alreadyBlocked = shouldBlockNewOptionSignal({
+                symbol: target.symbol,
+                side: 'CALL',
+                action: 'BTST CALL'
+            }) || shouldBlockNewOptionSignal({
+                symbol: target.symbol,
+                side: 'PUT',
+                action: 'BTST PUT'
+            });
+            if (alreadyBlocked) continue;
+
+            // Scan higher timeframes for trend alignment
+            const tfResults = [];
+            for (const tf of btstTimeframes) {
+                try {
+                    await ensureAutoIndicators(target, tf);
+                    const indicators = latestIndicatorsBySymbol[target.symbol] || {};
+                    const fischerSynergy = TechnicalIndicators.calculateFischerSynergy(indicators);
+
+                    if (fischerSynergy && fischerSynergy.direction !== 'NEUTRAL') {
+                        tfResults.push({
+                            timeframe: tf,
+                            direction: fischerSynergy.direction,
+                            synergyScore: fischerSynergy.synergyScore || 0,
+                            quality: fischerSynergy.quality || 'STANDARD',
+                            confirmCount: fischerSynergy.confirmCount || 0
+                        });
+                    }
+                } catch (e) { /* skip this timeframe */ }
+            }
+
+            // Need both 1hr AND Daily to agree
+            if (tfResults.length < 2) continue;
+            const bullish = tfResults.filter(r => r.direction === 'BULLISH');
+            const bearish = tfResults.filter(r => r.direction === 'BEARISH');
+            if (bullish.length < 2 && bearish.length < 2) continue;
+
+            const direction = bullish.length >= 2 ? 'BULLISH' : 'BEARISH';
+            const bestTF = (direction === 'BULLISH' ? bullish : bearish)
+                .sort((a, b) => b.synergyScore - a.synergyScore)[0];
+
+            if (bestTF.synergyScore < minSynergyScore) continue;
+
+            // Get option chain for BTST evaluation
+            const spot = await getAutoSpotPrice(target);
+            if (!spot) continue;
+
+            // Find expiry 2+ days away
+            let expiryDate = target.expiryDate;
+            const daysToExpiry = OptionSignalEngine.getDaysToExpiry(expiryDate);
+            if (daysToExpiry < 1.5) {
+                const expiries = getUpcomingExpiriesForSymbol(target.symbol, 4);
+                expiryDate = expiries.find(e => OptionSignalEngine.getDaysToExpiry(e) >= 1.5) || expiryDate;
+            }
+
+            const data = await AngelOneAPI.getOptionsChain(target, expiryDate, spot);
+            const chain = data?.data;
+            if (!chain || !hasOptionChainRows(chain)) continue;
+
+            // Evaluate on 1hr timeframe
+            await ensureAutoIndicators(target, 'ONE_HOUR');
+            const hourIndicators = latestIndicatorsBySymbol[target.symbol] || {};
+            const evaluation = OptionSignalEngine.evaluateChain(
+                target.symbol, chain, hourIndicators, spot, { timeframe: 'ONE_HOUR' }
+            );
+
+            // Find best option in the confirmed direction
+            const wantedSide = direction === 'BULLISH' ? 'CALL' : 'PUT';
+            const candidates = evaluation.rows
+                .map(row => wantedSide === 'CALL' ? row.call : row.put)
+                .filter(item => item.score >= minConfidence && item.action !== 'NO TRADE')
+                .sort((a, b) => b.score - a.score);
+
+            if (!candidates.length) continue;
+
+            const btstSignal = candidates[0];
+            btstSignal.action = `BTST ${wantedSide}`;
+            btstSignal.expiryDate = expiryDate;
+            btstSignal.source = 'Auto BTST Scan';
+            btstSignal.segment = target.segment;
+
+            const tradeBlocked = shouldBlockNewOptionSignal(btstSignal);
+            if (tradeBlocked) continue;
+
+            // Signal found! Add to active signals and send to Telegram
+            addActiveOptionSignal(btstSignal);
+            recordSignalTime(btstSignal.symbol, btstSignal.side);
+            AngelOneAPI.log(`BTST ${wantedSide}: ${btstSignal.symbol} ${btstSignal.strike} score ${btstSignal.score}% (${bestTF.quality}, 1hr+Daily confirmed)`);
+
+            const telegramSent = await TelegramNotifier.sendOptionSignal(btstSignal);
+            registerOptionTrade(btstSignal, { telegramSent });
+
+            // Only one BTST per scan cycle to avoid spam
+            break;
+
+        } catch (err) {
+            AngelOneAPI.log(`BTST scan error ${target.symbol}: ${err.message}`);
+        }
+
+        if (!isDemoMode) await delay(500);
     }
 }
 

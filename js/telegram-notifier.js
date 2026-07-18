@@ -332,7 +332,7 @@ const TelegramNotifier = {
 
     isAlertAction: function(action) {
         const text = String(action || '');
-        return text.startsWith('BUY') || text.startsWith('BTST');
+        return text.startsWith('BUY') || text.startsWith('BTST') || text.startsWith('SWING');
     },
 
     sendMessage: async function(text, botToken, chatId) {
