@@ -29,6 +29,8 @@ const latestOptionTicksByToken = {};
 let lastWebSocketSubscriptionKey = '';
 const optionTradeHistoryStorageKey = 'optionTradeHistory';
 const maxOptionTradeHistory = 250;
+const callHistoryStorageKey = 'callHistoryPermanent';
+const maxCallHistory = 1000;
 const activeOptionSignalsStorageKey = 'activeOptionSignals';
 const maxActiveOptionSignals = 300;
 const autoScanState = {
@@ -2405,6 +2407,7 @@ function updateActiveTradeLtpFromTick(token, ltp) {
         if (status !== 'Open') {
             trade.status = status;
             trade.closedAt = trade.updatedAt;
+            moveTradeToHistory(trade);
             notifyTradeExit(trade, status, ltp);
             AngelOneAPI.log(`${status}: ${trade.symbol} ${trade.strike} ${trade.side} @ ${OptionSignalEngine.formatMoney(ltp)}`);
         }
@@ -2465,6 +2468,64 @@ function getOptionTradeHistory() {
 function saveOptionTradeHistory(history) {
     localStorage.setItem(optionTradeHistoryStorageKey, JSON.stringify(history.slice(0, maxOptionTradeHistory)));
 }
+
+// ==================== PERSISTENT CALL HISTORY ====================
+// This is a separate permanent store. Active Trades are temporary (cleared daily),
+// but Call History persists so you can track P&L over days/weeks.
+
+function getCallHistory() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(callHistoryStorageKey) || '[]');
+        return Array.isArray(saved) ? saved : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveCallHistory(history) {
+    localStorage.setItem(callHistoryStorageKey, JSON.stringify(history.slice(0, maxCallHistory)));
+}
+
+function moveTradeToHistory(trade) {
+    if (!trade || !trade.symbol) return;
+    const history = getCallHistory();
+    // Avoid duplicates (same key + same openedAt)
+    const isDuplicate = history.some(h =>
+        h.key === trade.key && h.openedAt === trade.openedAt
+    );
+    if (isDuplicate) return;
+
+    const historyEntry = {
+        ...trade,
+        movedToHistoryAt: new Date().toISOString()
+    };
+    history.unshift(historyEntry);
+    saveCallHistory(history);
+}
+
+function moveAllTradesToHistory(trades) {
+    if (!Array.isArray(trades) || !trades.length) return;
+    const history = getCallHistory();
+    const existingKeys = new Set(history.map(h => `${h.key}|${h.openedAt}`));
+
+    trades.forEach(trade => {
+        if (!trade || !trade.symbol) return;
+        const uniqueKey = `${trade.key}|${trade.openedAt}`;
+        if (existingKeys.has(uniqueKey)) return;
+        existingKeys.add(uniqueKey);
+        history.unshift({
+            ...trade,
+            movedToHistoryAt: new Date().toISOString()
+        });
+    });
+
+    saveCallHistory(history);
+}
+
+function clearCallHistory() {
+    localStorage.removeItem(callHistoryStorageKey);
+}
+// ==================== END PERSISTENT CALL HISTORY ====================
 
 function getOptionTradeKey(signal) {
     return [
@@ -2585,6 +2646,7 @@ function updateOptionTradeHistoryFromEvaluation(evaluation) {
         if (status !== 'Open') {
             trade.status = status;
             trade.closedAt = trade.updatedAt;
+            moveTradeToHistory(trade);
             removeActiveOptionSignalsForSymbol(trade.symbol);
             notifyTradeExit(trade, status, ltp);
             AngelOneAPI.log(`${status}: ${trade.symbol} ${trade.strike} ${trade.side} @ ${OptionSignalEngine.formatMoney(ltp)}`);
@@ -2614,6 +2676,7 @@ function expireOptionTrades(history = getOptionTradeHistory()) {
             trade.updatedAt = trade.closedAt;
             trade.pnl = getPaperPnl(trade);
             trade.pnlPercent = getPaperPnlPercent(trade);
+            moveTradeToHistory(trade);
             removeActiveOptionSignalsForSymbol(trade.symbol);
             notifyTradeExit(trade, trade.status, trade.lastLtp || trade.entry || 0);
             changed = true;
@@ -2808,10 +2871,24 @@ function getTradeStatusClass(status) {
 }
 
 function clearOptionTradeHistory() {
+    // Move all trades to permanent Call History before clearing Active Trades
+    const trades = getOptionTradeHistory();
+    if (trades.length) {
+        // Mark any still-open trades as "Cleared" so history shows they were manually closed
+        trades.forEach(trade => {
+            if (trade.status === 'Open') {
+                trade.status = 'Cleared';
+                trade.closedAt = new Date().toISOString();
+            }
+        });
+        moveAllTradesToHistory(trades);
+    }
+
     localStorage.removeItem(optionTradeHistoryStorageKey);
     TelegramNotifier.clearAllMemory();
     clearActiveOptionSignals();
     renderOptionTradeHistory();
+    renderHistoryView();
 }
 
 // FIX: Segment detection helpers
@@ -2861,9 +2938,9 @@ function updateSegmentPnlDisplay(prefix, openPnl, closedPnl, trades) {
     if (closedCountEl) closedCountEl.textContent = closedCount;
 }
 
-// FIX: Call history - filter by date
+// FIX: Call history - filter by date (reads from PERMANENT history store)
 function getCallsByDate(dateStr) {
-    const history = getOptionTradeHistory();
+    const history = getCallHistory();
     return history.filter(trade => {
         const d = new Date(trade.openedAt || 0);
         return getIndiaDateKey(d) === dateStr;
@@ -2871,13 +2948,76 @@ function getCallsByDate(dateStr) {
 }
 
 function getTodayCalls() {
-    return getCallsByDate(getIndiaDateKey(new Date()));
+    // Today's calls: from permanent history + any currently active trades
+    const todayKey = getIndiaDateKey(new Date());
+    const fromHistory = getCallsByDate(todayKey);
+    const activeTrades = getOptionTradeHistory().filter(trade => {
+        const d = new Date(trade.openedAt || 0);
+        return getIndiaDateKey(d) === todayKey;
+    });
+    // Merge without duplicates
+    const existingKeys = new Set(fromHistory.map(h => `${h.key}|${h.openedAt}`));
+    activeTrades.forEach(trade => {
+        const uniqueKey = `${trade.key}|${trade.openedAt}`;
+        if (!existingKeys.has(uniqueKey)) {
+            fromHistory.push(trade);
+            existingKeys.add(uniqueKey);
+        }
+    });
+    return fromHistory;
 }
 
 function getYesterdayCalls() {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     return getCallsByDate(getIndiaDateKey(yesterday));
+}
+
+function getAllTimeCalls() {
+    // Merge permanent history + active trades
+    const history = getCallHistory();
+    const activeTrades = getOptionTradeHistory();
+    const existingKeys = new Set(history.map(h => `${h.key}|${h.openedAt}`));
+    activeTrades.forEach(trade => {
+        const uniqueKey = `${trade.key}|${trade.openedAt}`;
+        if (!existingKeys.has(uniqueKey)) {
+            history.push(trade);
+            existingKeys.add(uniqueKey);
+        }
+    });
+    return history;
+}
+
+function getLast7DaysCalls() {
+    const history = getCallHistory();
+    const activeTrades = getOptionTradeHistory();
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    cutoff.setHours(0, 0, 0, 0);
+    const cutoffTime = cutoff.getTime();
+
+    const merged = [...history];
+    const existingKeys = new Set(merged.map(h => `${h.key}|${h.openedAt}`));
+    activeTrades.forEach(trade => {
+        const uniqueKey = `${trade.key}|${trade.openedAt}`;
+        if (!existingKeys.has(uniqueKey)) {
+            merged.push(trade);
+            existingKeys.add(uniqueKey);
+        }
+    });
+
+    return merged.filter(trade => {
+        const openedAt = new Date(trade.openedAt || 0).getTime();
+        return openedAt >= cutoffTime;
+    });
+}
+
+function confirmClearCallHistory() {
+    if (confirm('Are you sure? This will permanently delete all Call History data. Active Trades will not be affected.')) {
+        clearCallHistory();
+        renderHistoryView();
+        AngelOneAPI.log('Call History cleared by user.');
+    }
 }
 
 function renderHistoryView() {
@@ -2894,8 +3034,11 @@ function renderHistoryView() {
     } else if (filter === 'yesterday') {
         calls = getYesterdayCalls();
         label = 'Yesterday';
+    } else if (filter === '7days') {
+        calls = getLast7DaysCalls();
+        label = 'Last 7 Days';
     } else {
-        calls = getOptionTradeHistory();
+        calls = getAllTimeCalls();
         label = 'All Time';
     }
 
@@ -3934,14 +4077,21 @@ function runDailyReset() {
     Object.keys(indexPriceHistory).forEach(k => delete indexPriceHistory[k]);
     Object.keys(latestDayOpenBySymbol).forEach(k => delete latestDayOpenBySymbol[k]);
 
+    // Move all yesterday's trades to permanent Call History, then clear Active Trades
     const history = getOptionTradeHistory();
-    history.forEach(trade => {
-        if (trade.status === 'Open') trade.status = 'Market Closed';
-    });
-    saveOptionTradeHistory(sortOptionTradeHistory(history));
+    if (history.length) {
+        history.forEach(trade => {
+            if (trade.status === 'Open') trade.status = 'Market Closed';
+        });
+        moveAllTradesToHistory(history);
+    }
+
+    // Clear Active Trades for new day (history is now safe in permanent store)
+    localStorage.removeItem(optionTradeHistoryStorageKey);
     renderOptionTradeHistory();
 
     localStorage.setItem(dailyResetKey, todayKey);
+    AngelOneAPI.log(`Daily reset done. ${history.length} trades moved to Call History.`);
 }
 
 function getOpenStrikesForSymbol(symbol) {
