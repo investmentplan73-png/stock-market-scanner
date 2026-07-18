@@ -2241,7 +2241,7 @@ async function runSwingScan() {
         return;
     }
 
-    renderOptionMessage('Running Swing Scan (15min + 1hr timeframes)...');
+    renderOptionMessage('Running Swing Scan (1hr + Daily + Weekly timeframes)...');
 
     const resolvedScanner = await resolveScannerTarget(scanner);
     if (!resolvedScanner.token) {
@@ -2284,8 +2284,8 @@ async function runSwingScan() {
         return;
     }
 
-    // Scan on both 15min and 1hr timeframes
-    const timeframes = swingSettings.timeframes || ['FIFTEEN_MINUTE', 'ONE_HOUR'];
+    // Scan on 1hr, 1Day, and 1Week timeframes
+    const timeframes = swingSettings.timeframes || ['ONE_HOUR', 'ONE_DAY', 'ONE_WEEK'];
     const swingResults = [];
 
     for (const tf of timeframes) {
@@ -2321,15 +2321,17 @@ async function runSwingScan() {
         }
     }
 
-    // Check multi-timeframe agreement
+    // Check multi-timeframe agreement (need at least 2 out of 3 timeframes)
     const bullishTFs = swingResults.filter(r => r.direction === 'BULLISH');
     const bearishTFs = swingResults.filter(r => r.direction === 'BEARISH');
-    const multiTFConfirmed = bullishTFs.length >= 2 || bearishTFs.length >= 2;
+    const minTFsAgree = Number(swingSettings.minTimeframesAgree || 2);
+    const multiTFConfirmed = bullishTFs.length >= minTFsAgree || bearishTFs.length >= minTFsAgree;
     const dominantDirection = bullishTFs.length > bearishTFs.length ? 'BULLISH'
         : bearishTFs.length > bullishTFs.length ? 'BEARISH' : 'NEUTRAL';
 
-    if (dominantDirection === 'NEUTRAL') {
-        renderOptionMessage('Swing Scan: No clear direction on higher timeframes. No swing call.');
+    if (dominantDirection === 'NEUTRAL' || !multiTFConfirmed) {
+        const scanned = swingResults.map(r => `${r.timeframe}=${r.direction}`).join(', ');
+        renderOptionMessage(`Swing Scan: Need ${minTFsAgree}+ timeframes in same direction. Got: ${scanned || 'no clear signal'}. No swing call.`);
         return;
     }
 
