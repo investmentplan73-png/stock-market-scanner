@@ -8,7 +8,7 @@ let isDemoMode = false;
 // FIX: OHLC and price history tracking for index cards
 const indexOHLC = {};
 const indexPriceHistory = {}; // Last 30 prices for mini chart
-const INDEX_HISTORY_MAX = 30;
+const INDEX_HISTORY_MAX = 60;
 let liveDataFailureCount = 0;
 let isFetchingMarketData = false;
 let nextMarketDataFetchAt = 0;
@@ -200,7 +200,7 @@ function startMarketDataUpdates() {
         AngelOneAPI.initWebSocket();
         fetchMarketData();
         updateIndicators();
-        marketDataInterval = setInterval(fetchMarketData, 5000);
+        marketDataInterval = setInterval(fetchMarketData, 3000);
         updateInterval = setInterval(
             updateIndicators,
             Number(Config.autoScanner.indicatorRefreshSeconds || 120) * 1000
@@ -254,7 +254,7 @@ async function fetchMarketData() {
 
     isFetchingMarketData = true;
     try {
-        const data = await AngelOneAPI.getLTP(getOpenOptionExchangeTokens(getIndexExchangeTokens()));
+        const data = await AngelOneAPI.getLTP(getOpenOptionExchangeTokens(getIndexExchangeTokens()), 'FULL');
         const rows = data && data.data ? (Array.isArray(data.data) ? data.data : Object.values(data.data)) : [];
 
         if (!rows.length) {
@@ -384,14 +384,39 @@ function updateIndexPrices(data) {
         const ltp = Number(item.ltp ?? item.lastPrice ?? item.close ?? 0);
         if (!Number.isFinite(ltp) || ltp <= 0) return;
 
+        // Extract OHLC from FULL mode API response
+        const apiOpen = Number(item.open ?? item.openPrice ?? item.ohlc?.open ?? 0);
+        const apiHigh = Number(item.high ?? item.highPrice ?? item.dayHigh ?? item.ohlc?.high ?? 0);
+        const apiLow = Number(item.low ?? item.lowPrice ?? item.dayLow ?? item.ohlc?.low ?? 0);
+        const apiClose = Number(item.close ?? item.closePrice ?? item.ohlc?.close ?? ltp);
+
+        // Update OHLC from API data (more accurate than local tracking)
+        if (apiOpen > 0 && apiHigh > 0 && apiLow > 0) {
+            indexOHLC[symbol] = {
+                open: apiOpen,
+                high: Math.max(apiHigh, ltp),
+                low: Math.min(apiLow, ltp),
+                close: ltp
+            };
+        } else if (indexOHLC[symbol]) {
+            // Fallback: update local OHLC with new LTP
+            indexOHLC[symbol].close = ltp;
+            if (ltp > indexOHLC[symbol].high) indexOHLC[symbol].high = ltp;
+            if (ltp < indexOHLC[symbol].low) indexOHLC[symbol].low = ltp;
+        } else {
+            indexOHLC[symbol] = { open: ltp, high: ltp, low: ltp, close: ltp };
+        }
+
         // FIX: Store previous close from API data for correct change calculation
         const prevClose = Number(item.previousClose ?? item.prevClose ?? item.lastClose ?? item.closePrice ?? 0);
         if (Number.isFinite(prevClose) && prevClose > 0) {
             latestReferenceCloseBySymbol[symbol] = prevClose;
         }
 
-        // FIX: Track day open (first price of the day)
-        if (!latestDayOpenBySymbol[symbol]) {
+        // FIX: Track day open from API or first price
+        if (apiOpen > 0 && !latestDayOpenBySymbol[symbol]) {
+            latestDayOpenBySymbol[symbol] = apiOpen;
+        } else if (!latestDayOpenBySymbol[symbol]) {
             latestDayOpenBySymbol[symbol] = ltp;
         }
 
@@ -585,19 +610,21 @@ function updateIndexCard(symbol, price, changeInfo = null) {
         ? Number(changeInfo.percent || 0)
         : 0;
 
-    // FIX: Track OHLC
+    // Track price history for mini chart (OHLC is now managed in updateIndexPrices)
     if (ltp > 0) {
+        if (!indexPriceHistory[symbol]) indexPriceHistory[symbol] = [];
+        indexPriceHistory[symbol].push(ltp);
+        if (indexPriceHistory[symbol].length > INDEX_HISTORY_MAX) indexPriceHistory[symbol].shift();
+
+        // If OHLC not set yet (e.g. from WebSocket tick), initialize it
         if (!indexOHLC[symbol]) {
             indexOHLC[symbol] = { open: ltp, high: ltp, low: ltp, close: ltp };
         } else {
+            // Update close and H/L from live ticks
             indexOHLC[symbol].close = ltp;
             if (ltp > indexOHLC[symbol].high) indexOHLC[symbol].high = ltp;
             if (ltp < indexOHLC[symbol].low) indexOHLC[symbol].low = ltp;
         }
-        // Track price history for mini chart
-        if (!indexPriceHistory[symbol]) indexPriceHistory[symbol] = [];
-        indexPriceHistory[symbol].push(ltp);
-        if (indexPriceHistory[symbol].length > INDEX_HISTORY_MAX) indexPriceHistory[symbol].shift();
     }
 
     const ohlc = indexOHLC[symbol] || {};
