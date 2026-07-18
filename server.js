@@ -18,6 +18,7 @@ const ANGEL_BASE = 'https://apiconnect.angelbroking.com';
 const ANGEL_WS_URL = 'wss://smartapisocket.angelone.in/smart-stream';
 const INSTRUMENT_MASTER_URL = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
 const INSTRUMENT_CACHE_FILE = path.join(ROOT, '.cache', 'OpenAPIScripMaster.json');
+const USERS_FILE = path.join(ROOT, '.cache', 'users.json');
 
 let instrumentCache = {
     loadedAt: 0,
@@ -120,6 +121,21 @@ async function handleApi(req, res) {
 
     if (req.method === 'GET' && req.url === '/api/health') {
         sendJson(res, 200, { status: true, message: 'OK' });
+        return;
+    }
+
+    // Auth routes (allow before POST check for flexibility)
+    if (req.method === 'POST' && req.url === '/api/auth/signup') {
+        const body = await readJson(req);
+        const result = await handleAuthSignup(body);
+        sendJson(res, result.success ? 200 : 400, result);
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/auth/login') {
+        const body = await readJson(req);
+        const result = await handleAuthLogin(body);
+        sendJson(res, result.success ? 200 : 401, result);
         return;
     }
 
@@ -1811,4 +1827,118 @@ function readInt64LeSafe(buffer, offset) {
     const value = buffer.readBigInt64LE(offset);
     const number = Number(value);
     return Number.isSafeInteger(number) ? number : null;
+}
+
+// ==================== USER AUTHENTICATION ====================
+
+function loadUsers() {
+    try {
+        const data = fs.readFileSync(USERS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveUsers(users) {
+    const dir = path.dirname(USERS_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function hashPassword(password) {
+    return crypto.createHash('sha256').update(password + 'options-scanner-salt-2024').digest('hex');
+}
+
+function generateToken() {
+    return crypto.randomBytes(32).toString('hex');
+}
+
+async function handleAuthSignup(body) {
+    const name = String(body.name || '').trim();
+    const email = String(body.email || '').trim().toLowerCase();
+    const mobile = String(body.mobile || '').trim();
+    const password = String(body.password || '');
+
+    if (!name || name.length < 2) {
+        return { success: false, message: 'Name must be at least 2 characters' };
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return { success: false, message: 'Valid email is required' };
+    }
+    if (!mobile || !/^[\+]?[0-9]{10,15}$/.test(mobile.replace(/\s+/g, ''))) {
+        return { success: false, message: 'Valid mobile number is required (10-15 digits)' };
+    }
+    if (!password || password.length < 6) {
+        return { success: false, message: 'Password must be at least 6 characters' };
+    }
+
+    const users = loadUsers();
+
+    // Check if email already exists
+    if (users.find(u => u.email === email)) {
+        return { success: false, message: 'Email is already registered. Please login.' };
+    }
+
+    // Check if mobile already exists
+    const cleanMobile = mobile.replace(/\s+/g, '');
+    if (users.find(u => u.mobile && u.mobile.replace(/\s+/g, '') === cleanMobile)) {
+        return { success: false, message: 'Mobile number is already registered. Please login.' };
+    }
+
+    const newUser = {
+        id: crypto.randomUUID(),
+        name,
+        email,
+        mobile: cleanMobile,
+        passwordHash: hashPassword(password),
+        createdAt: new Date().toISOString()
+    };
+
+    users.push(newUser);
+    saveUsers(users);
+
+    const token = generateToken();
+    console.log(`New user registered: ${email} (${name})`);
+
+    return {
+        success: true,
+        message: 'Account created successfully',
+        user: { id: newUser.id, name: newUser.name, email: newUser.email, mobile: newUser.mobile },
+        token
+    };
+}
+
+async function handleAuthLogin(body) {
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+
+    if (!email || !password) {
+        return { success: false, message: 'Email and password are required' };
+    }
+
+    const users = loadUsers();
+    const user = users.find(u =>
+        u.email === email || u.mobile === email.replace(/\s+/g, '') || u.name.toLowerCase() === email
+    );
+
+    if (!user) {
+        return { success: false, message: 'No account found with this email/username. Please sign up.' };
+    }
+
+    if (user.passwordHash !== hashPassword(password)) {
+        return { success: false, message: 'Incorrect password. Please try again.' };
+    }
+
+    const token = generateToken();
+    console.log(`User logged in: ${user.email}`);
+
+    return {
+        success: true,
+        message: 'Login successful',
+        user: { id: user.id, name: user.name, email: user.email, mobile: user.mobile },
+        token
+    };
 }

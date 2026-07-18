@@ -4,6 +4,7 @@ const TelegramNotifier = {
     lastAlertByKey: {},
     lastSkipLogByKey: {},
     lastSendError: '',
+    sentSignalsStorageKey: 'telegramSentSignals',
     stockHourlyStorageKey: 'telegramStockOptionHourlySent',
 
     getSentSignals: function() {

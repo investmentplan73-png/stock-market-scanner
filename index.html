@@ -2,157 +2,72 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Options Signal Scanner - Live index, stock, and commodity signals with P&L tracking">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Options Signal Scanner</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e0e0; font-size: 14px; line-height: 1.5; }
-        .container { max-width: 1600px; margin: 0 auto; padding: 16px; }
-
-        /* HEADER */
-        .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; margin-bottom: 16px; }
-        .header h1 { font-size: 22px; font-weight: 700; color: #4fc3f7; }
-        .header .subtitle { font-size: 13px; color: #888; margin-top: 2px; }
-        .api-status { display: flex; gap: 14px; align-items: center; font-size: 13px; }
-        .status-disconnected { color: #ef5350; font-weight: 600; }
-        .status-connected { color: #66bb6a; font-weight: 600; }
-
-        /* CONFIG */
-        .config-panel { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
-        .config-panel h2 { font-size: 18px; margin-bottom: 14px; color: #e0e0e0; }
-        .config-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-        .form-group { display: flex; flex-direction: column; gap: 5px; }
-        .form-group label { font-size: 13px; color: #aaa; font-weight: 600; }
-        .form-group input, .form-group select { padding: 10px 14px; background: #0f3460; border: 1px solid #3a3a5a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
-        .form-group input:focus { border-color: #4fc3f7; outline: none; }
-        .helper-text { font-size: 12px; color: #777; margin-top: 8px; }
-
-        /* BUTTONS */
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .btn-primary { background: #4fc3f7; color: #000; }
-        .btn-secondary { background: #2a2a4a; color: #e0e0e0; border: 1px solid #3a3a5a; }
-        .btn-small { padding: 8px 14px; font-size: 13px; }
-        .button-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-        /* INDEX CARDS */
-        .index-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 16px; }
-        .card { background: #16213e; border: 2px solid #2a2a4a; border-radius: 12px; padding: 20px 16px; text-align: center; }
-        .card h3 { font-size: 14px; color: #aaa; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .card .price { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 6px; }
-        .card .change { margin-bottom: 8px; font-size: 16px; font-weight: 700; }
-        .up { color: #66bb6a !important; }
-        .down { color: #ef5350 !important; }
-        .flat { color: #aaa !important; }
-        .ohlc { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 13px; color: #ccc; margin: 8px 0; padding: 8px 10px; background: #0f3460; border-radius: 8px; text-align: left; }
-        .ohlc .lbl { color: #777; font-weight: 500; }
-        .mini-chart { display: block; margin: 8px auto 0; width: 100%; height: 35px; }
-
-        /* P&L CARDS */
-        .pnl-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
-        .pnl-card { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 22px; }
-        .pnl-card-header { font-size: 13px; color: #888; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; letter-spacing: 1px; }
-        .pnl-card-main { font-size: 32px; font-weight: 700; margin-bottom: 12px; }
-        .pnl-card-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-top: 1px solid #2a2a4a; }
-        .pnl-card-label { color: #888; }
-        .pnl-card-value { font-weight: 600; color: #e0e0e0; }
-
-        /* SECTIONS */
-        .section { background: #16213e; border: 1px solid #2a2a4a; border-radius: 12px; margin-bottom: 14px; }
-        .section-heading { display: flex; justify-content: space-between; align-items: center; padding: 16px 22px; cursor: pointer; }
-        .section-heading:hover { background: #1a2744; }
-        .section-heading h2 { font-size: 17px; font-weight: 600; color: #e0e0e0; }
-        .section-body { padding: 0 22px 22px; }
-        .section-body.collapsed { display: none; }
-        .collapse-arrow { font-size: 15px; color: #777; transition: transform 0.2s; }
-        .collapse-arrow.open { transform: rotate(90deg); }
-
-        /* OPTIONS SELECTOR — BIGGER */
-        .options-selector { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; align-items: flex-end; }
-        .options-selector label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #aaa; font-weight: 500; }
-        .options-selector select, .options-selector input { padding: 10px 14px; background: #0f3460; border: 1px solid #3a3a5a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
-        .checkbox-label { flex-direction: row !important; align-items: center; gap: 8px !important; }
-
-        /* TABLES */
-        .options-table { overflow-x: auto; }
-        .options-table table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        .options-table th { background: #0f3460; padding: 12px 14px; text-align: left; font-weight: 600; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .options-table td { padding: 10px 14px; border-bottom: 1px solid #2a2a4a; color: #e0e0e0; }
-        .options-table tr:hover { background: #1a2744; }
-
-        /* TRADE STATUS */
-        .trade-status { padding: 4px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; }
-        .status-open { background: #1565c0; color: #fff; }
-        .status-target { background: #2e7d32; color: #fff; }
-        .status-sl { background: #c62828; color: #fff; }
-        .status-trend { background: #f57f17; color: #000; }
-        .status-expired { background: #555; color: #fff; }
-
-        .segment-tag { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; }
-        .segment-index { background: #1565c0; color: #fff; }
-        .segment-stock { background: #7b1fa2; color: #fff; }
-        .segment-commodity { background: #f57f17; color: #000; }
-
-        /* SCAN STATUS */
-        .scan-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
-        .scan-status-card { background: #0f3460; border-radius: 10px; padding: 14px; font-size: 13px; }
-        .scan-status-card span { color: #777; font-size: 12px; }
-        .scan-status-card strong { font-size: 16px; color: #e0e0e0; display: block; margin-top: 3px; }
-
-        /* HISTORY */
-        .history-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
-        .history-card { background: #0f3460; border-radius: 10px; padding: 16px; text-align: center; }
-        .history-card-label { font-size: 12px; color: #777; text-transform: uppercase; }
-        .history-card-value { font-size: 22px; font-weight: 700; color: #e0e0e0; margin-top: 4px; }
-        .history-card-sub { font-size: 11px; color: #888; margin-top: 3px; }
-
-        /* OPTION SUMMARY — COMPACT */
-        .option-summary { background: #0f3460; border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; font-size: 13px; color: #e0e0e0; border-left: 4px solid #4fc3f7; }
-        .summary-title { font-weight: 700; margin-bottom: 6px; font-size: 14px; color: #4fc3f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .summary-grid { display: flex; gap: 4px 16px; flex-wrap: wrap; align-items: baseline; }
-        .summary-metric { font-size: 12px; color: #999; white-space: nowrap; }
-        .summary-metric strong { font-size: 13px; color: #fff; margin-left: 3px; }
-        .summary-reasons { font-size: 11px; color: #7a8a9a; margin-top: 4px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-
-        /* SIGNALS — BIG CARD */
-        .signal-card { background: #0f3460; border-left: 4px solid #4fc3f7; border-radius: 0 10px 10px 0; padding: 16px 20px; margin-bottom: 10px; }
-        .signal-card.buy { border-left-color: #66bb6a; }
-        .signal-card.sell { border-left-color: #ef5350; }
-        .signal-card h4 { font-size: 16px; color: #fff; margin-bottom: 6px; }
-        .signal-details { font-size: 13px; color: #aaa; line-height: 1.6; }
-
-        /* LOG */
-        .log-container { background: #0f3460; border-radius: 10px; padding: 12px; max-height: 220px; overflow-y: auto; font-family: monospace; font-size: 13px; }
-        .log-entry { padding: 3px 0; color: #aaa; border-bottom: 1px solid #1a2744; }
-
-        .hidden { display: none !important; }
-        .no-signals { color: #777; padding: 24px; text-align: center; font-size: 14px; }
-        .table-note { font-size: 11px; color: #777; display: block; }
-        .table-toggle-row { margin-bottom: 10px; }
-        .table-dropdown-toggle { background: #0f3460; border: 1px solid #3a3a5a; color: #aaa; cursor: pointer; font-size: 13px; padding: 6px 14px; border-radius: 8px; }
-        .table-dropdown-toggle:hover { background: #1a2744; }
-        .trade-symbol-button { background: none; border: none; color: #e0e0e0; cursor: pointer; text-align: left; padding: 0; font: inherit; }
-        .trade-symbol-button:hover { color: #4fc3f7; }
-        .trade-row-actions { margin-top: 4px; }
-
-        .indicators-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-        .indicator-card { background: #0f3460; border-radius: 10px; padding: 14px; }
-        .indicator-card h4 { font-size: 13px; color: #777; margin-bottom: 6px; }
-        .indicator-value { font-size: 18px; font-weight: 700; color: #fff; }
-        .indicator-status { font-size: 12px; color: #aaa; margin-top: 3px; }
-
-        /* P&L color classes */
-        .pnl-positive, td.pnl-positive, span.pnl-positive { color: #66bb6a !important; }
-        .pnl-negative, td.pnl-negative, span.pnl-negative { color: #ef5350 !important; }
-        .history-stats.up { color: #66bb6a !important; }
-        .history-stats.down { color: #ef5350 !important; }
-
-        @media (max-width: 1200px) { .index-cards { grid-template-columns: repeat(3, 1fr); } .pnl-summary { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 768px) { .index-cards { grid-template-columns: repeat(2, 1fr); } .pnl-summary { grid-template-columns: 1fr; } .scan-status-grid { grid-template-columns: repeat(2, 1fr); } .history-cards { grid-template-columns: repeat(2, 1fr); } }
-    </style>
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="container">
+
+<!-- AUTH SCREEN -->
+<div class="auth-container" id="authContainer">
+    <div class="auth-card">
+        <div class="auth-header">
+            <h1>Options Signal Scanner</h1>
+            <p>Login to access live market signals</p>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form class="auth-form" id="loginForm" onsubmit="return handleLogin(event)">
+            <div class="auth-form-group">
+                <label for="loginEmail">Email or Username</label>
+                <input type="text" id="loginEmail" placeholder="Enter email or username" required autocomplete="username">
+            </div>
+            <div class="auth-form-group">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter password" required autocomplete="current-password">
+            </div>
+            <p class="auth-error" id="loginError"></p>
+            <button type="submit" class="btn btn-primary btn-full" id="loginBtn">Login</button>
+            <p class="auth-switch">Don't have an account? <a href="#" onclick="showSignupForm()">Create Account</a></p>
+        </form>
+
+        <!-- SIGNUP FORM -->
+        <form class="auth-form hidden" id="signupForm" onsubmit="return handleSignup(event)">
+            <div class="auth-form-group">
+                <label for="signupName">Full Name</label>
+                <input type="text" id="signupName" placeholder="Your name" required autocomplete="name">
+            </div>
+            <div class="auth-form-group">
+                <label for="signupEmail">Email</label>
+                <input type="email" id="signupEmail" placeholder="your@email.com" required autocomplete="email">
+            </div>
+            <div class="auth-form-group">
+                <label for="signupMobile">Mobile Number</label>
+                <input type="tel" id="signupMobile" placeholder="+91 9876543210" required autocomplete="tel" pattern="[\+]?[0-9]{10,15}">
+            </div>
+            <div class="auth-form-group">
+                <label for="signupPassword">Password</label>
+                <input type="password" id="signupPassword" placeholder="Min 6 characters" required minlength="6" autocomplete="new-password">
+            </div>
+            <div class="auth-form-group">
+                <label for="signupConfirm">Confirm Password</label>
+                <input type="password" id="signupConfirm" placeholder="Repeat password" required minlength="6" autocomplete="new-password">
+            </div>
+            <p class="auth-error" id="signupError"></p>
+            <button type="submit" class="btn btn-primary btn-full" id="signupBtn">Create Account</button>
+            <p class="auth-switch">Already have an account? <a href="#" onclick="showLoginForm()">Login</a></p>
+        </form>
+    </div>
+</div>
+
+<!-- MAIN APP (hidden until logged in) -->
+<div class="container hidden" id="appContainer">
 
     <header class="header">
         <div>
@@ -160,40 +75,42 @@
             <p class="subtitle">Index / Stock / Commodity — Live signals with P&L tracking</p>
         </div>
         <div class="api-status">
+            <span id="loggedInUser" style="color:#4fc3f7;font-size:12px"></span>
             <span id="connectionStatus" class="status-disconnected">Disconnected</span>
             <span id="lastUpdate" style="color:#777">--:--:--</span>
+            <button class="btn btn-small btn-secondary" onclick="handleLogout()" title="Logout">Logout</button>
         </div>
     </header>
 
     <div class="config-panel" id="configPanel">
         <h2>Angel One API</h2>
         <div class="config-form">
-            <div class="form-group"><label>API Key</label><input type="text" id="apiKey" placeholder="API key"></div>
-            <div class="form-group"><label>Password</label><input type="password" id="apiSecret" placeholder="Password"></div>
-            <div class="form-group"><label>Client ID</label><input type="text" id="clientId" placeholder="Client ID"></div>
-            <div class="form-group"><label>TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP"></div>
-            <div class="form-group"><label>Static IP</label><input type="text" id="publicIp" placeholder="SmartAPI IP"></div>
+            <div class="form-group"><label for="apiKey">API Key</label><input type="text" id="apiKey" placeholder="API key" autocomplete="off"></div>
+            <div class="form-group"><label for="apiSecret">Password</label><input type="password" id="apiSecret" placeholder="Password" autocomplete="off"></div>
+            <div class="form-group"><label for="clientId">Client ID</label><input type="text" id="clientId" placeholder="Client ID" autocomplete="off"></div>
+            <div class="form-group"><label for="totpSecret">TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP" autocomplete="one-time-code"></div>
+            <div class="form-group"><label for="publicIp">Static IP</label><input type="text" id="publicIp" placeholder="SmartAPI IP" autocomplete="off"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
             </div>
         </div>
-        <p class="helper-text" id="loginError"></p>
+        <p class="helper-text" id="apiLoginError"></p>
     </div>
 
     <main class="dashboard" id="dashboard" style="display:none">
 
         <!-- INDEX CARDS -->
-        <section class="index-cards">
-            <div class="card" id="niftyCard"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="change" id="niftyChange">--</div><div class="ohlc" id="niftyOhlc"></div><canvas class="mini-chart" id="niftyChart" width="200" height="35"></canvas></div>
-            <div class="card" id="bankniftyCard"><h3>BANKNIFTY</h3><div class="price" id="bankniftyPrice">--</div><div class="change" id="bankniftyChange">--</div><div class="ohlc" id="bankniftyOhlc"></div><canvas class="mini-chart" id="bankniftyChart" width="200" height="35"></canvas></div>
-            <div class="card" id="sensexCard"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="change" id="sensexChange">--</div><div class="ohlc" id="sensexOhlc"></div><canvas class="mini-chart" id="sensexChart" width="200" height="35"></canvas></div>
-            <div class="card" id="finniftyCard"><h3>FINNIFTY</h3><div class="price" id="finniftyPrice">--</div><div class="change" id="finniftyChange">--</div><div class="ohlc" id="finniftyOhlc"></div><canvas class="mini-chart" id="finniftyChart" width="200" height="35"></canvas></div>
-            <div class="card" id="midcpniftyCard"><h3>MIDCAP</h3><div class="price" id="midcpniftyPrice">--</div><div class="change" id="midcpniftyChange">--</div><div class="ohlc" id="midcpniftyOhlc"></div><canvas class="mini-chart" id="midcpniftyChart" width="200" height="35"></canvas></div>
+        <section class="index-cards" aria-label="Market indices">
+            <div class="card" id="niftyCard"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="change" id="niftyChange">--</div><div class="ohlc" id="niftyOhlc"></div><canvas class="mini-chart" id="niftyChart" width="200" height="35" aria-label="NIFTY price chart"></canvas></div>
+            <div class="card" id="bankniftyCard"><h3>BANKNIFTY</h3><div class="price" id="bankniftyPrice">--</div><div class="change" id="bankniftyChange">--</div><div class="ohlc" id="bankniftyOhlc"></div><canvas class="mini-chart" id="bankniftyChart" width="200" height="35" aria-label="BANKNIFTY price chart"></canvas></div>
+            <div class="card" id="sensexCard"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="change" id="sensexChange">--</div><div class="ohlc" id="sensexOhlc"></div><canvas class="mini-chart" id="sensexChart" width="200" height="35" aria-label="SENSEX price chart"></canvas></div>
+            <div class="card" id="finniftyCard"><h3>FINNIFTY</h3><div class="price" id="finniftyPrice">--</div><div class="change" id="finniftyChange">--</div><div class="ohlc" id="finniftyOhlc"></div><canvas class="mini-chart" id="finniftyChart" width="200" height="35" aria-label="FINNIFTY price chart"></canvas></div>
+            <div class="card" id="midcpniftyCard"><h3>MIDCAP</h3><div class="price" id="midcpniftyPrice">--</div><div class="change" id="midcpniftyChange">--</div><div class="ohlc" id="midcpniftyOhlc"></div><canvas class="mini-chart" id="midcpniftyChart" width="200" height="35" aria-label="MIDCAP price chart"></canvas></div>
         </section>
 
         <!-- P&L -->
-        <section class="pnl-summary">
+        <section class="pnl-summary" aria-label="Profit and Loss summary">
             <div class="pnl-card">
                 <div class="pnl-card-header">Index P&L</div>
                 <div class="pnl-card-main" id="indexPnlMain">0.00</div>
@@ -288,11 +205,11 @@
             </div>
         </section>
 
-        <!-- INDICATORS — SEPARATE SECTION -->
+        <!-- INDICATORS -->
         <section class="section">
             <div class="section-heading" onclick="toggleSection(this)"><h2>Technical Indicators</h2><span class="collapse-arrow">&#9654;</span></div>
             <div class="section-body collapsed">
-                <select id="indicatorSelector" onchange="refreshDisplayedIndicators()" style="margin-bottom:14px;padding:10px 14px;background:#0f3460;border:1px solid #3a3a5a;border-radius:8px;color:#e0e0e0;font-size:14px">
+                <select id="indicatorSelector" onchange="refreshDisplayedIndicators()" style="margin-bottom:14px;padding:10px 14px;background:#0f3460;border:1px solid #3a3a5a;border-radius:8px;color:#e0e0e0;font-size:14px" aria-label="Select index for indicators">
                     <option value="NIFTY">NIFTY</option><option value="BANKNIFTY">BANKNIFTY</option><option value="FINNIFTY">FINNIFTY</option>
                     <option value="MIDCPNIFTY">MIDCAP</option><option value="SENSEX">SENSEX</option>
                     <option value="CRUDEOIL">CRUDEOIL</option><option value="GOLD">GOLD</option><option value="SILVER">SILVER</option>
@@ -334,7 +251,7 @@
             </div>
         </section>
 
-        <!-- ACTIVE SIGNALS — SEPARATE FROM INDICATORS -->
+        <!-- ACTIVE SIGNALS -->
         <section class="section">
             <div class="section-heading" onclick="toggleSection(this)"><h2>Active Call Signals</h2><span class="collapse-arrow">&#9654;</span></div>
             <div class="section-body collapsed">
@@ -353,7 +270,9 @@
 
     </main>
 </div>
+
 <script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}</script>
+<script src="js/auth.js"></script>
 <script src="js/config.js"></script>
 <script src="js/technical-indicators.js"></script>
 <script src="js/angel-one-api.js"></script>

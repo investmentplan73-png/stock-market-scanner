@@ -8,3 +8,19 @@ server-live.log
 .response.json
 .cache/
 .agents/
+
+# Sensitive data
+.env
+*.pem
+*.key
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

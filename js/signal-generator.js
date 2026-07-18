@@ -83,6 +83,10 @@ const SignalGenerator = {
         // Add to signals array if it's a strong signal
         if (confidence >= Config.signals.minConfidence) {
             this.signals.push(signalObj);
+            // Cap signals array to prevent memory leak
+            if (this.signals.length > 100) {
+                this.signals = this.signals.slice(-50);
+            }
             this.signalHistory.push(signalObj);
             
             // Keep only last 50 signals in history
