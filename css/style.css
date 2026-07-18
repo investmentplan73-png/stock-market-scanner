@@ -135,6 +135,8 @@ body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e
 .card-compact .change { font-size: 12px; margin-bottom: 4px; }
 .card-compact .ohlc { font-size: 10px; gap: 2px 6px; padding: 4px 6px; margin: 4px 0 0; }
 .card-compact .mini-chart { height: 25px; margin: 4px auto 0; }
+.card-compact.card-selected { border-color: #00d4ff; box-shadow: 0 0 12px rgba(0,212,255,0.3); }
+.card-compact:hover { border-color: #00d4ff55; }
 .card h3 { font-size: 12px; color: #aaa; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 .card .price { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; }
 .card .change { margin-bottom: 4px; font-size: 13px; font-weight: 700; }

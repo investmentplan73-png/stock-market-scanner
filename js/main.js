@@ -4601,6 +4601,49 @@ function changeAutoScanScope() {
     autoScanState.resolvedCommodities = [];
     autoScanState.stockCursor = 0;
     autoScanState.commodityCursor = 0;
+
+    // Remove card highlight when switching away from SELECTED
+    if (scope !== 'SELECTED') {
+        document.querySelectorAll('.index-cards .card-compact').forEach(card => {
+            card.classList.remove('card-selected');
+        });
+    }
+
+    runMarketWideScan(true);
+}
+
+// Select a specific index for scanning - clicked from index cards
+function selectIndexForScan(symbol) {
+    // Update the indexSelector dropdown to match clicked card
+    const indexSelector = document.getElementById('indexSelector');
+    if (indexSelector) {
+        // Check if symbol exists in options, if not MIDCPNIFTY might be the value
+        const optionExists = Array.from(indexSelector.options).some(opt => opt.value === symbol);
+        if (optionExists) {
+            indexSelector.value = symbol;
+        }
+    }
+
+    // Set segment to INDEX
+    const segmentSelect = document.getElementById('optionSegment');
+    if (segmentSelect) segmentSelect.value = 'INDEX';
+
+    // Set scope to SELECTED so only this index gets scanned
+    const scopeSelect = document.getElementById('autoScanScope');
+    if (scopeSelect) scopeSelect.value = 'SELECTED';
+    Config.autoScanner.scope = 'SELECTED';
+    Config.saveConfig();
+
+    // Highlight the selected card
+    document.querySelectorAll('.index-cards .card-compact').forEach(card => {
+        card.classList.remove('card-selected');
+    });
+    const cardId = symbol.toLowerCase().replace(/\s+/g, '') + 'Card';
+    const selectedCard = document.getElementById(cardId);
+    if (selectedCard) selectedCard.classList.add('card-selected');
+
+    // Load options chain for the selected index and trigger scan
+    if (typeof loadOptionsChain === 'function') loadOptionsChain(true);
     runMarketWideScan(true);
 }
 
