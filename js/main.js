@@ -166,19 +166,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function loadSavedCredentials() {
     const saved = localStorage.getItem('stockMarketConfig');
-    if (!saved) return;
-
-    try {
-        const config = JSON.parse(saved);
-        document.getElementById('apiKey').value = config.apiKey || '';
-        document.getElementById('apiSecret').value = config.apiSecret || '';
-        document.getElementById('clientId').value = config.clientId || '';
-        document.getElementById('totpSecret').value = config.totpSecret || '';
-        const publicIp = document.getElementById('publicIp');
-        if (publicIp) publicIp.value = config.publicIp || '';
-    } catch (error) {
-        console.warn('Could not load saved credentials', error);
+    if (saved) {
+        try {
+            const config = JSON.parse(saved);
+            document.getElementById('apiKey').value = config.apiKey || '';
+            document.getElementById('apiSecret').value = config.apiSecret || '';
+            document.getElementById('clientId').value = config.clientId || '';
+            document.getElementById('totpSecret').value = config.totpSecret || '';
+            const publicIp = document.getElementById('publicIp');
+            if (publicIp) publicIp.value = config.publicIp || '';
+            return;
+        } catch (error) {
+            console.warn('Could not load saved credentials from localStorage', error);
+        }
     }
+
+    // Fallback: load from server backup
+    const proxyBase = (typeof PROXY_BASE !== 'undefined' && PROXY_BASE) ? PROXY_BASE : '';
+    fetch(proxyBase + '/api/credentials/load')
+        .then(res => res.json())
+        .then(result => {
+            if (result.success && result.data) {
+                const d = result.data;
+                document.getElementById('apiKey').value = d.apiKey || '';
+                document.getElementById('apiSecret').value = d.apiSecret || '';
+                document.getElementById('clientId').value = d.clientId || '';
+                document.getElementById('totpSecret').value = d.totpSecret || '';
+                const publicIp = document.getElementById('publicIp');
+                if (publicIp) publicIp.value = d.publicIp || '';
+            }
+        })
+        .catch(() => {});
 }
 
 function checkExistingConnection() {

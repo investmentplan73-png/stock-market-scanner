@@ -395,6 +395,22 @@ const Config = {
             }
         };
         localStorage.setItem('stockMarketConfig', JSON.stringify(config));
+
+        // Server-side backup so credentials survive Render restarts
+        try {
+            const proxyBase = (typeof PROXY_BASE !== 'undefined' && PROXY_BASE) ? PROXY_BASE : '';
+            fetch(proxyBase + '/api/credentials/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    apiKey: this.apiKey,
+                    apiSecret: this.apiSecret,
+                    clientId: this.clientId,
+                    totpSecret: this.totpSecret,
+                    publicIp: this.publicIp
+                })
+            }).catch(() => {});
+        } catch (e) {}
     },
     
     // Load configuration from localStorage

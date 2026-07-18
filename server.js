@@ -19,6 +19,7 @@ const ANGEL_WS_URL = 'wss://smartapisocket.angelone.in/smart-stream';
 const INSTRUMENT_MASTER_URL = 'https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json';
 const INSTRUMENT_CACHE_FILE = path.join(ROOT, '.cache', 'OpenAPIScripMaster.json');
 const USERS_FILE = path.join(ROOT, '.cache', 'users.json');
+const CREDENTIALS_FILE = path.join(ROOT, '.cache', 'credentials.json');
 
 let instrumentCache = {
     loadedAt: 0,
@@ -252,6 +253,39 @@ async function handleApi(req, res) {
     if (req.url === '/api/telegram-send') {
         const data = await sendTelegramMessage(body);
         sendJson(res, data.ok ? 200 : 400, data);
+        return;
+    }
+
+    if (req.url === '/api/credentials/save') {
+        const creds = {
+            apiKey: body.apiKey || '',
+            apiSecret: body.apiSecret || '',
+            clientId: body.clientId || '',
+            totpSecret: body.totpSecret || '',
+            publicIp: body.publicIp || '',
+            savedAt: new Date().toISOString()
+        };
+        try {
+            fs.mkdirSync(path.join(ROOT, '.cache'), { recursive: true });
+            fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(creds, null, 2));
+            sendJson(res, 200, { success: true, message: 'Credentials saved on server' });
+        } catch (e) {
+            sendJson(res, 500, { success: false, message: 'Failed to save: ' + e.message });
+        }
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/credentials/load') {
+        try {
+            if (fs.existsSync(CREDENTIALS_FILE)) {
+                const data = JSON.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf8'));
+                sendJson(res, 200, { success: true, data });
+            } else {
+                sendJson(res, 200, { success: false, message: 'No saved credentials' });
+            }
+        } catch (e) {
+            sendJson(res, 500, { success: false, message: 'Failed to load: ' + e.message });
+        }
         return;
     }
 
