@@ -85,10 +85,12 @@ document.addEventListener('DOMContentLoaded', function() {
     handleOptionSegmentChange();
     TelegramNotifier.loadForm();
     loadAutoScannerForm();
+    // FIX: Clean old trades BEFORE rendering - only today's calls stay in Active Trades
+    cleanOldActiveTrades();
+    runDailyReset();
     renderOptionTradeHistory();
     loadActiveOptionSignals();
     resetClosedMarketsTradeState();
-    runDailyReset();
     checkExistingConnection();
 });
 
@@ -2773,7 +2775,28 @@ function notifyTradeExit(trade, status, ltp) {
 }
 
 function getPaperPnl(trade) {
-    return Number(trade.lastLtp || 0) - Number(trade.entry || 0);
+    const entry = Number(trade.entry || 0);
+    if (!entry) return 0;
+
+    let exitPrice = Number(trade.lastLtp || 0);
+
+    // For closed trades where lastLtp might be missing, use appropriate exit price
+    if (!exitPrice && trade.status && trade.status !== 'Open') {
+        if (trade.status === 'SL Hit' || trade.status === 'SL') {
+            exitPrice = Number(trade.stopLoss || 0);
+        } else if (trade.status === 'Target 1 Hit') {
+            exitPrice = Number(trade.target1 || 0);
+        } else if (trade.status === 'Target 2 Hit') {
+            exitPrice = Number(trade.target2 || 0);
+        } else if (trade.status === 'Expired' || trade.status === 'Market Closed') {
+            // For expired/market closed, assume worst case = entry (0 P&L) if no LTP
+            exitPrice = entry;
+        } else {
+            exitPrice = entry; // No data = assume flat
+        }
+    }
+
+    return exitPrice - entry;
 }
 
 function getPaperLotPnl(trade) {
@@ -2827,8 +2850,9 @@ function renderOptionTradeHistory() {
     updateSegmentPnlDisplay('commodityPnl', commodityOpenPnl, commodityClosedPnl, commodityTrades);
 
     if (stats) {
-        stats.textContent = `${openTrades.length} open | ${closedTrades.length} closed | Total P&L ${formatSignedNumber(totalOpenPnl)}`;
-        stats.className = totalOpenPnl >= 0 ? 'history-stats up' : 'history-stats down';
+        const totalPnl = totalOpenPnl + indexClosedPnl + stockClosedPnl + commodityClosedPnl;
+        stats.textContent = `${openTrades.length} open | ${closedTrades.length} closed | Total P&L ${formatSignedNumber(totalPnl)}`;
+        stats.className = totalPnl >= 0 ? 'history-stats up' : 'history-stats down';
     }
 
     if (!sorted.length) {
@@ -2906,7 +2930,14 @@ function clearOptionTradeHistory() {
             if (trade.status === 'Open') {
                 trade.status = 'Cleared';
                 trade.closedAt = new Date().toISOString();
+                // Ensure lastLtp is set for P&L calculation
+                if (!trade.lastLtp) {
+                    trade.lastLtp = trade.entry || 0;
+                }
             }
+            // Compute P&L for all trades before moving to history
+            trade.pnl = getPaperPnl(trade);
+            trade.pnlPercent = getPaperPnlPercent(trade);
         });
         moveAllTradesToHistory(trades);
     }
@@ -4088,6 +4119,52 @@ function shouldBlockNewOptionSignal(signal) {
     return 'symbol-already-active';
 }
 
+// FIX: On every page load, move old (not today's) trades to history and remove from Active Trades.
+// This ensures Active Trades only shows fresh/live calls from today's session.
+function cleanOldActiveTrades() {
+    const todayKey = getIndiaDateKey(new Date());
+    const history = getOptionTradeHistory();
+
+    // Also clean old active option signals
+    const signals = getActiveOptionSignals();
+    if (signals.length) {
+        const todaySignals = signals.filter(signal => {
+            const signalDate = getIndiaDateKey(new Date(signal.generatedAt || signal.timestamp || 0));
+            return signalDate === todayKey;
+        });
+        if (todaySignals.length !== signals.length) {
+            saveActiveOptionSignals(todaySignals);
+        }
+    }
+
+    if (!history.length) return;
+
+    const todayTrades = [];
+    const oldTrades = [];
+
+    history.forEach(trade => {
+        const tradeDate = getIndiaDateKey(new Date(trade.openedAt || 0));
+        if (tradeDate === todayKey) {
+            todayTrades.push(trade);
+        } else {
+            // Mark open trades from old days as "Market Closed"
+            if (trade.status === 'Open') {
+                trade.status = 'Market Closed';
+                trade.closedAt = trade.closedAt || new Date().toISOString();
+            }
+            oldTrades.push(trade);
+        }
+    });
+
+    if (oldTrades.length) {
+        // Move old trades to permanent history
+        moveAllTradesToHistory(oldTrades);
+        // Keep only today's trades in Active Trades
+        saveOptionTradeHistory(todayTrades);
+        AngelOneAPI.log(`Startup cleanup: ${oldTrades.length} old trade(s) moved to Call History. ${todayTrades.length} today's trade(s) kept.`);
+    }
+}
+
 function runDailyReset() {
     const dailyResetKey = 'dailyResetLastRun';
     const todayKey = getIndiaDateKey(new Date());
@@ -4108,7 +4185,16 @@ function runDailyReset() {
     const history = getOptionTradeHistory();
     if (history.length) {
         history.forEach(trade => {
-            if (trade.status === 'Open') trade.status = 'Market Closed';
+            if (trade.status === 'Open') {
+                trade.status = 'Market Closed';
+                trade.closedAt = new Date().toISOString();
+                // Ensure lastLtp is set for P&L calculation
+                if (!trade.lastLtp) {
+                    trade.lastLtp = trade.entry || 0;
+                }
+                trade.pnl = getPaperPnl(trade);
+                trade.pnlPercent = getPaperPnlPercent(trade);
+            }
         });
         moveAllTradesToHistory(history);
     }
