@@ -2313,10 +2313,11 @@ function updateOptionsTable(optionsData, symbolOverride = null, resolvedExpiryDa
         evaluation.best.segment = scanner.segment;
         const tradeBlocked = shouldBlockNewOptionSignal(evaluation.best);
         if (tradeBlocked) {
-            AngelOneAPI.log(`Skipped ${symbol} ${evaluation.best.side}: one open call is already active for this stock.`);
+            AngelOneAPI.log(`Skipped ${symbol} ${evaluation.best.side}: ${tradeBlocked}`);
         }
         if (isTradeAlertAction(evaluation.best.action) && !tradeBlocked) {
             AngelOneAPI.log(`${evaluation.best.action}: ${symbol} ${evaluation.best.strike} ${evaluation.best.side} score ${evaluation.best.score}%`);
+            recordSignalTime(evaluation.best.symbol, evaluation.best.side);
             TelegramNotifier.sendOptionSignal(evaluation.best).then(sent => {
                 registerOptionTrade(evaluation.best, { telegramSent: sent });
             });
@@ -3587,12 +3588,13 @@ async function runMarketWideScan(force = false) {
                         AngelOneAPI.log(`Market mood filter skipped ${signal.symbol} ${signal.side}: ${blockedByMood}`);
                     }
                     if (tradeBlocked) {
-                        AngelOneAPI.log(`Auto scanner skipped ${signal.symbol}: one open call is already active for this stock.`);
+                        AngelOneAPI.log(`Auto scanner skipped ${signal.symbol} ${signal.side}: ${tradeBlocked}`);
                     }
 
                     if (!tradeBlocked && (isTradeAlertAction(signal.action) || Config.autoScanner.includeWatchSignals)) {
                         foundSignals.push(signal);
                         addActiveOptionSignal(signal);
+                        recordSignalTime(signal.symbol, signal.side);
                     }
                     if (!tradeBlocked && isTradeAlertAction(signal.action)) {
                         const telegramSent = await TelegramNotifier.sendOptionSignal(signal);
@@ -4260,18 +4262,68 @@ function shouldBlockNewOptionSignal(signal) {
     if (!signal || !isTradeAlertAction(signal.action)) return false;
     if (Config.tradeLock?.enabled === false) return false;
 
+    const signalSymbol = String(signal.symbol || '').toUpperCase();
+    const signalSide = String(signal.side || '').toUpperCase();
+
     // FIX: Block ALL calls for same symbol until current call closes
-    // Previously only blocked same strike+side, allowing duplicate calls
     const openTrade = getOpenOptionTradeForSymbol(signal.symbol);
-    if (!openTrade) return false;
+    if (openTrade) {
+        const sameCall = Number(openTrade.strike) === Number(signal.strike)
+            && String(openTrade.side || '').toUpperCase() === signalSide;
+        if (sameCall) return 'same-open-call';
+        return 'symbol-already-active';
+    }
 
-    const sameCall = Number(openTrade.strike) === Number(signal.strike)
-        && String(openTrade.side || '').toUpperCase() === String(signal.side || '').toUpperCase();
+    // FIX: Block duplicate signals - only ONE signal per symbol+side allowed
+    // If there's already an active signal for same symbol+side (any strike), block new one
+    const activeSignals = getActiveOptionSignals();
+    const existingSignal = activeSignals.find(s =>
+        String(s.symbol || '').toUpperCase() === signalSymbol
+        && String(s.side || '').toUpperCase() === signalSide
+        && isTradeAlertAction(s.action)
+    );
+    if (existingSignal) {
+        // Allow only if new signal has significantly better score (>10 points)
+        const existingScore = Number(existingSignal.score || 0);
+        const newScore = Number(signal.score || 0);
+        if (newScore <= existingScore + 10) {
+            return 'signal-already-exists';
+        }
+        // Better signal found - remove old one, allow new one through
+        removeActiveSignalByKey(getOptionSignalKey(existingSignal));
+    }
 
-    if (sameCall) return 'same-open-call';
+    // FIX: Cooldown - block if signal was generated for same symbol+side in last 2 minutes
+    const recentSignalTime = getLastSignalTimeForSymbolSide(signalSymbol, signalSide);
+    if (recentSignalTime && (Date.now() - recentSignalTime) < 120000) {
+        return 'cooldown-active';
+    }
 
-    // Block different strike for same symbol - one call at a time!
-    return 'symbol-already-active';
+    return false;
+}
+
+// Track last signal time per symbol+side
+const lastSignalTimeMap = {};
+function recordSignalTime(symbol, side) {
+    const key = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}`;
+    lastSignalTimeMap[key] = Date.now();
+}
+function getLastSignalTimeForSymbolSide(symbol, side) {
+    const key = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}`;
+    return lastSignalTimeMap[key] || 0;
+}
+
+// Remove a specific active signal by key
+function removeActiveSignalByKey(key) {
+    if (!key) return;
+    const signals = getActiveOptionSignals().filter(s => getOptionSignalKey(s) !== key);
+    saveActiveOptionSignals(signals);
+    const container = document.getElementById('signalsContainer');
+    if (container) {
+        [...container.children].forEach(child => {
+            if (child.dataset?.signalKey === key) child.remove();
+        });
+    }
 }
 
 // FIX: On every page load, move old (not today's) trades to history and remove from Active Trades.
