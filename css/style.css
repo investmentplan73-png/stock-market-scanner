@@ -145,6 +145,10 @@ body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e
 .ohlc .lbl { color: #777; font-weight: 500; }
 .mini-chart { display: block; margin: 6px auto 0; width: 100%; height: 28px; }
 
+/* VIX card special style */
+.card-vix { border-color: #ff9800; background: linear-gradient(135deg, #16213e 0%, #1a1a0e 100%); }
+.card-vix h3 { color: #ff9800; }
+
 /* ==================== MARKET BREADTH ==================== */
 .market-breadth { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
 .breadth-card { display: flex; align-items: center; gap: 10px; background: #16213e; border: 1px solid #2a2a4a; border-radius: 10px; padding: 12px 18px; }
