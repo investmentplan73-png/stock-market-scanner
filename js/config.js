@@ -12,7 +12,7 @@ const Config = {
     
     // API Endpoints
     endpoints: {
-        proxyBase: 'http://localhost:8787',
+        proxyBase: window.location.origin,
         login: '/api/login',
         logout: '/api/logout',
         marketData: '/api/market-data',
