@@ -1321,6 +1321,398 @@ const TechnicalIndicators = {
         return { k, d };
     },
 
+    // ==================== FISCHER SYNERGY ENGINE ====================
+    // Based on Robert Fischer's "Candlesticks, Fibonacci, and Chart Pattern Trading Tools"
+    // Chapter 6: Merging Fibonacci with Candlesticks and Chart Patterns
+    // Signal only fires when multiple confirmations align - reduces fake calls significantly
+    
+    calculateFischerSynergy: function(indicators) {
+        if (!indicators) return null;
+
+        const fib = indicators.FibonacciContext;
+        const candles = indicators.CandlestickPatterns;
+        const charts = indicators.ChartPatterns;
+        const volume = indicators.Volume;
+        const obv = indicators.OBV;
+        const adx = indicators.ADX;
+        const macd = indicators.MACD;
+        const advRsi = indicators.AdvancedRSI;
+
+        const confirmations = [];
+        let direction = 'NEUTRAL';
+        let synergyScore = 0;
+        let fibLevel = null;
+        let priceTarget = null;
+        let timeTarget = null;
+
+        // === LAYER 1: Fibonacci Position (Is price at a key Fibonacci level?) ===
+        let fibConfirm = false;
+        let fibStrength = 0;
+        if (fib && fib.direction !== 'NEUTRAL') {
+            if (fib.inGoldenZone) {
+                // Price is in 50-61.8% golden zone - strongest Fibonacci signal
+                fibConfirm = true;
+                fibStrength = 40;
+                fibLevel = 'Golden Zone (50-61.8%)';
+                confirmations.push({ source: 'Fibonacci', detail: 'Price in Golden Zone', weight: 40 });
+            } else if (fib.nearest && fib.nearest.distancePercent <= 0.5) {
+                // Price is within 0.5% of any Fibonacci level
+                fibConfirm = true;
+                fibStrength = 30;
+                fibLevel = `Fib ${(Number(fib.nearest.ratio) * 100).toFixed(1)}%`;
+                confirmations.push({ source: 'Fibonacci', detail: `Near ${fibLevel}`, weight: 30 });
+            } else if (fib.breakout !== 'NONE') {
+                // Price has broken Fibonacci extension
+                fibConfirm = true;
+                fibStrength = 35;
+                fibLevel = 'Extension Breakout';
+                confirmations.push({ source: 'Fibonacci', detail: 'Extension breakout', weight: 35 });
+            }
+        }
+
+        // === LAYER 2: Candlestick Pattern Confirmation ===
+        let candleConfirm = false;
+        let candleStrength = 0;
+        if (candles && candles.direction !== 'NEUTRAL' && candles.strength >= 64) {
+            candleConfirm = true;
+            candleStrength = Math.min(35, candles.strength * 0.4);
+            const patternName = candles.primary ? candles.primary.name : 'Pattern';
+            confirmations.push({ source: 'Candlestick', detail: patternName, weight: candleStrength });
+        }
+
+        // === LAYER 3: Chart Pattern Confirmation ===
+        let chartConfirm = false;
+        let chartStrength = 0;
+        if (charts && charts.direction !== 'NEUTRAL' && charts.strength >= 70) {
+            chartConfirm = true;
+            chartStrength = Math.min(30, charts.strength * 0.35);
+            const patternName = charts.primary ? charts.primary.name : 'Chart Pattern';
+            confirmations.push({ source: 'ChartPattern', detail: patternName, weight: chartStrength });
+        }
+
+        // === LAYER 4: Volume Confirmation ===
+        let volumeConfirm = false;
+        let volumeStrength = 0;
+        if (volume && this.isNumber(volume.ratio) && volume.ratio >= 1.3) {
+            volumeConfirm = true;
+            volumeStrength = Math.min(20, volume.ratio * 8);
+            confirmations.push({ source: 'Volume', detail: `${volume.ratio.toFixed(1)}x avg`, weight: volumeStrength });
+        } else if (obv && obv.direction !== 'NEUTRAL') {
+            volumeConfirm = true;
+            volumeStrength = 15;
+            confirmations.push({ source: 'OBV', detail: obv.direction, weight: volumeStrength });
+        }
+
+        // === LAYER 5: Momentum Confirmation (ADX/MACD/RSI) ===
+        let momentumConfirm = false;
+        let momentumStrength = 0;
+        let momentumDirection = 'NEUTRAL';
+        
+        if (adx && this.isNumber(adx.adx) && adx.adx > 22) {
+            momentumConfirm = true;
+            momentumDirection = adx.plusDI > adx.minusDI ? 'BULLISH' : 'BEARISH';
+            momentumStrength += 12;
+        }
+        if (macd && this.isNumber(macd.histogram)) {
+            if (macd.histogram > 0 && macd.macd > macd.signal) {
+                momentumConfirm = true;
+                if (momentumDirection === 'NEUTRAL') momentumDirection = 'BULLISH';
+                momentumStrength += 10;
+            } else if (macd.histogram < 0 && macd.macd < macd.signal) {
+                momentumConfirm = true;
+                if (momentumDirection === 'NEUTRAL') momentumDirection = 'BEARISH';
+                momentumStrength += 10;
+            }
+        }
+        if (advRsi && advRsi.signal && advRsi.signal !== 'HOLD') {
+            momentumConfirm = true;
+            if (momentumDirection === 'NEUTRAL') momentumDirection = advRsi.direction;
+            momentumStrength += 10;
+        }
+        if (momentumConfirm) {
+            confirmations.push({ source: 'Momentum', detail: momentumDirection, weight: momentumStrength });
+        }
+
+        // === SYNERGY DECISION: Need at least 2 confirmations in same direction ===
+        const confirmCount = [fibConfirm, candleConfirm, chartConfirm, volumeConfirm, momentumConfirm]
+            .filter(Boolean).length;
+
+        if (confirmCount < 2) {
+            // Not enough confirmations - no synergy signal
+            return {
+                direction: 'NEUTRAL',
+                signal: 'HOLD',
+                synergyScore: 0,
+                confirmations: [],
+                confirmCount: confirmCount,
+                fibLevel: null,
+                priceTarget: null,
+                timeTarget: null,
+                reason: 'Insufficient confirmations (need 2+)'
+            };
+        }
+
+        // Determine direction by majority vote of confirmations
+        let bullishVotes = 0;
+        let bearishVotes = 0;
+
+        if (fibConfirm && fib) {
+            if (fib.direction === 'BULLISH') bullishVotes++;
+            else if (fib.direction === 'BEARISH') bearishVotes++;
+        }
+        if (candleConfirm && candles) {
+            if (candles.direction === 'BULLISH') bullishVotes++;
+            else if (candles.direction === 'BEARISH') bearishVotes++;
+        }
+        if (chartConfirm && charts) {
+            if (charts.direction === 'BULLISH') bullishVotes++;
+            else if (charts.direction === 'BEARISH') bearishVotes++;
+        }
+        if (volumeConfirm && volume) {
+            if (volume.priceDirection === 'UP') bullishVotes++;
+            else if (volume.priceDirection === 'DOWN') bearishVotes++;
+        }
+        if (momentumConfirm) {
+            if (momentumDirection === 'BULLISH') bullishVotes++;
+            else if (momentumDirection === 'BEARISH') bearishVotes++;
+        }
+
+        // Need clear majority - if split, no signal
+        if (bullishVotes === bearishVotes || (bullishVotes === 0 && bearishVotes === 0)) {
+            return {
+                direction: 'NEUTRAL',
+                signal: 'HOLD',
+                synergyScore: 0,
+                confirmations: confirmations,
+                confirmCount: confirmCount,
+                fibLevel: fibLevel,
+                priceTarget: null,
+                timeTarget: null,
+                reason: 'Conflicting directions'
+            };
+        }
+
+        direction = bullishVotes > bearishVotes ? 'BULLISH' : 'BEARISH';
+        synergyScore = fibStrength + candleStrength + chartStrength + volumeStrength + momentumStrength;
+
+        // === FISCHER PRICE TARGET (Dual Ratio Extension) ===
+        // Based on Chapter 4: using 0.618 correction x 1.618 extension for target
+        if (fib && this.isNumber(fib.swingHigh) && this.isNumber(fib.swingLow) && this.isNumber(fib.currentPrice)) {
+            const range = fib.swingHigh - fib.swingLow;
+            if (direction === 'BULLISH') {
+                // Target: correction low + range * 1.618
+                const correctionLow = fib.swingHigh - (range * 0.618);
+                priceTarget = {
+                    conservative: fib.swingHigh, // Previous high
+                    moderate: correctionLow + (range * 1.272),
+                    aggressive: correctionLow + (range * 1.618),
+                    method: 'Fischer Dual Ratio (0.618 x 1.618)'
+                };
+            } else {
+                // Target: correction high - range * 1.618
+                const correctionHigh = fib.swingLow + (range * 0.618);
+                priceTarget = {
+                    conservative: fib.swingLow, // Previous low
+                    moderate: correctionHigh - (range * 1.272),
+                    aggressive: correctionHigh - (range * 1.618),
+                    method: 'Fischer Dual Ratio (0.618 x 1.618)'
+                };
+            }
+        }
+
+        // === FISCHER TIME TARGET (PHI-ratio based) ===
+        // Time between swings * 1.618 = expected next move duration
+        if (fib && this.isNumber(fib.swingHigh) && this.isNumber(fib.swingLow)) {
+            // Approximate: use lookback as swing duration proxy
+            const swingDuration = 55; // default lookback candles
+            timeTarget = {
+                phiCandles: Math.round(swingDuration * 0.618), // First PHI target
+                phiExtended: Math.round(swingDuration * 1.618), // Extended PHI target
+                method: 'Fischer PHI Time Analysis'
+            };
+        }
+
+        // === BONUS: Fischer's 3-level confirmation quality grade ===
+        let quality = 'STANDARD';
+        if (fibConfirm && candleConfirm && (chartConfirm || volumeConfirm)) {
+            quality = 'HIGH'; // Fibonacci + Candlestick + one more = Fischer's ideal
+            synergyScore = Math.min(100, synergyScore * 1.2); // 20% bonus
+        }
+        if (fibConfirm && candleConfirm && chartConfirm && volumeConfirm) {
+            quality = 'PREMIUM'; // All 4 confirm = extremely reliable
+            synergyScore = Math.min(100, synergyScore * 1.35); // 35% bonus
+        }
+
+        const signal = synergyScore >= 45 ? (direction === 'BULLISH' ? 'BUY' : 'SELL') : 'HOLD';
+
+        return {
+            direction,
+            signal,
+            synergyScore: Math.round(synergyScore),
+            strength: Math.round(synergyScore),
+            quality,
+            confirmations,
+            confirmCount,
+            fibLevel,
+            priceTarget,
+            timeTarget,
+            reason: `${confirmCount} confirmations aligned ${direction} (${quality})`
+        };
+    },
+
+    // Fischer Fibonacci Time Analysis
+    // Calculates PHI-ratio time targets for when next move is expected
+    calculateFibonacciTimeAnalysis: function(highs, lows, closes, lookback = 55) {
+        const length = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 15) return null;
+
+        const h = highs.slice(-lookback).map(Number).filter(Number.isFinite);
+        const l = lows.slice(-lookback).map(Number).filter(Number.isFinite);
+        const c = closes.slice(-lookback).map(Number).filter(Number.isFinite);
+        const n = Math.min(h.length, l.length, c.length);
+        if (n < 15) return null;
+
+        // Find swing points
+        const swings = [];
+        for (let i = 2; i < n - 2; i++) {
+            if (h[i] >= h[i - 1] && h[i] >= h[i - 2] && h[i] >= h[i + 1] && h[i] >= h[i + 2]) {
+                swings.push({ index: i, type: 'HIGH', value: h[i] });
+            }
+            if (l[i] <= l[i - 1] && l[i] <= l[i - 2] && l[i] <= l[i + 1] && l[i] <= l[i + 2]) {
+                swings.push({ index: i, type: 'LOW', value: l[i] });
+            }
+        }
+
+        if (swings.length < 3) return null;
+
+        // Sort by index
+        swings.sort((a, b) => a.index - b.index);
+
+        // Calculate time distances between consecutive swings
+        const timeDistances = [];
+        for (let i = 1; i < swings.length; i++) {
+            timeDistances.push(swings[i].index - swings[i - 1].index);
+        }
+
+        if (!timeDistances.length) return null;
+
+        const lastSwing = swings.at(-1);
+        const lastDistance = timeDistances.at(-1);
+        const avgDistance = timeDistances.reduce((sum, d) => sum + d, 0) / timeDistances.length;
+        const candlesSinceLastSwing = n - 1 - lastSwing.index;
+
+        // PHI time targets from last swing
+        const phiTargets = [
+            { ratio: 0.618, candles: Math.round(avgDistance * 0.618), label: 'PHI 0.618' },
+            { ratio: 1.0, candles: Math.round(avgDistance), label: 'Average' },
+            { ratio: 1.618, candles: Math.round(avgDistance * 1.618), label: 'PHI 1.618' },
+            { ratio: 2.618, candles: Math.round(avgDistance * 2.618), label: 'PHI 2.618' }
+        ];
+
+        // Find the next expected reversal window
+        const nextTargets = phiTargets
+            .map(t => ({ ...t, remaining: t.candles - candlesSinceLastSwing }))
+            .filter(t => t.remaining > 0);
+
+        const nearestTarget = nextTargets[0] || null;
+        const isInTimeWindow = nearestTarget && nearestTarget.remaining <= 3;
+
+        return {
+            lastSwing,
+            candlesSinceLastSwing,
+            avgSwingDistance: Math.round(avgDistance),
+            phiTargets,
+            nextTargets,
+            nearestTarget,
+            isInTimeWindow,
+            swingCount: swings.length
+        };
+    },
+
+    // Fischer Price Extension with Dual Ratio Confirmation
+    // Uses two Fibonacci ratios that multiply to confirm target validity
+    // 0.618 x 1.618 ≈ 1.0 (golden ratio product rule)
+    calculateFischerDualRatioTarget: function(highs, lows, closes, lookback = 55) {
+        const length = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 15) return null;
+
+        const h = highs.slice(-lookback).map(Number).filter(Number.isFinite);
+        const l = lows.slice(-lookback).map(Number).filter(Number.isFinite);
+        const c = closes.slice(-lookback).map(Number).filter(Number.isFinite);
+        const n = Math.min(h.length, l.length, c.length);
+        if (n < 15) return null;
+
+        const high = Math.max(...h);
+        const low = Math.min(...l);
+        const close = c.at(-1);
+        const range = high - low;
+        if (!this.isNumber(range) || range <= 0 || !this.isNumber(close)) return null;
+
+        const highIndex = h.lastIndexOf(high);
+        const lowIndex = l.lastIndexOf(low);
+        const trend = lowIndex < highIndex ? 'UP' : 'DOWN';
+
+        // Fischer's 5-wave extension targets using dual ratio confirmation
+        // Wave 1-2 correction ratio x Wave 3 extension = confirmed target
+        const correctionRatios = [0.382, 0.5, 0.618];
+        const extensionRatios = [1.272, 1.618, 2.0, 2.618];
+        const targets = [];
+
+        correctionRatios.forEach(cRatio => {
+            extensionRatios.forEach(eRatio => {
+                // Fischer's rule: when correction x extension ≈ PHI ratio, target is strong
+                const product = cRatio * eRatio;
+                const isPhiProduct = Math.abs(product - 1.0) <= 0.15
+                    || Math.abs(product - 0.618) <= 0.1
+                    || Math.abs(product - 1.618) <= 0.15;
+
+                if (isPhiProduct) {
+                    let targetPrice;
+                    if (trend === 'UP') {
+                        const correctionLevel = high - (range * cRatio);
+                        targetPrice = correctionLevel + (range * eRatio);
+                    } else {
+                        const correctionLevel = low + (range * cRatio);
+                        targetPrice = correctionLevel - (range * eRatio);
+                    }
+
+                    targets.push({
+                        correctionRatio: cRatio,
+                        extensionRatio: eRatio,
+                        product: Number(product.toFixed(3)),
+                        targetPrice: Number(targetPrice.toFixed(2)),
+                        isPhiConfirmed: true,
+                        strength: isPhiProduct ? 'STRONG' : 'MODERATE'
+                    });
+                }
+            });
+        });
+
+        // Sort targets by proximity to current price direction
+        targets.sort((a, b) => {
+            if (trend === 'UP') return a.targetPrice - b.targetPrice;
+            return b.targetPrice - a.targetPrice;
+        });
+
+        // Filter to only targets ahead of current price
+        const validTargets = targets.filter(t =>
+            trend === 'UP' ? t.targetPrice > close : t.targetPrice < close
+        );
+
+        return {
+            trend,
+            swingHigh: high,
+            swingLow: low,
+            currentPrice: close,
+            range,
+            targets: validTargets.slice(0, 4),
+            primaryTarget: validTargets[0] || null,
+            method: 'Fischer Dual Ratio (Correction x Extension = PHI)'
+        };
+    },
+
+    // ==================== END FISCHER SYNERGY ENGINE ====================
+
     getIndicatorSignal: function(indicator, value, params = {}) {
         if (value === null || value === undefined) return 'HOLD';
 
@@ -1361,6 +1753,11 @@ const TechnicalIndicators = {
                 if (value.direction === 'BULLISH') return 'BUY';
                 if (value.direction === 'BEARISH') return 'SELL';
                 return 'HOLD';
+
+            case 'FischerSynergy':
+                if (!value || !value.signal || value.signal === 'HOLD') return 'HOLD';
+                if (value.synergyScore < 45) return 'HOLD';
+                return value.signal;
 
             case 'MACD':
                 if (!value || !this.isNumber(value.histogram) || !this.isNumber(value.macd) || !this.isNumber(value.signal)) return 'HOLD';

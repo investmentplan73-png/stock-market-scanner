@@ -17,6 +17,7 @@ const SignalGenerator = {
         CandlestickPatterns: 'rsi',
         FibonacciContext: 'supportResistance',
         ChartPatterns: 'supportResistance',
+        FischerSynergy: 'supportResistance',
         MotherVolume: 'volume',
         PivotPoints: 'pivotPoints'
     },
@@ -33,6 +34,7 @@ const SignalGenerator = {
         
         // Check each indicator
         for (const [indicatorName, indicatorData] of Object.entries(safeIndicators)) {
+            if (indicatorName === 'FischerSynergy') continue; // Handled separately
             const configKey = this.indicatorConfigMap[indicatorName] || indicatorName.toLowerCase();
             const signal = TechnicalIndicators.getIndicatorSignal(
                 indicatorName,
@@ -48,6 +50,35 @@ const SignalGenerator = {
             if (signal === 'BUY') buySignals++;
             else if (signal === 'SELL') sellSignals++;
             else holdSignals++;
+        }
+
+        // === FISCHER SYNERGY LAYER ===
+        // Calculate synergy from all available indicators
+        const fischerSynergy = TechnicalIndicators.calculateFischerSynergy(safeIndicators);
+        let synergyBoost = 0;
+        let synergyDirection = 'NEUTRAL';
+        let synergyQuality = 'NONE';
+
+        if (fischerSynergy && fischerSynergy.signal !== 'HOLD' && fischerSynergy.synergyScore >= 45) {
+            synergyDirection = fischerSynergy.direction;
+            synergyQuality = fischerSynergy.quality;
+            signalDetails['FischerSynergy'] = fischerSynergy.signal;
+
+            // Synergy boost: adds virtual "votes" when multiple confirmations align
+            // This makes confirmed signals stronger without blocking unconfirmed ones
+            if (fischerSynergy.quality === 'PREMIUM') {
+                synergyBoost = 3; // 4 confirmations = 3 extra votes
+            } else if (fischerSynergy.quality === 'HIGH') {
+                synergyBoost = 2; // 3 confirmations = 2 extra votes
+            } else {
+                synergyBoost = 1; // 2 confirmations = 1 extra vote
+            }
+
+            if (fischerSynergy.signal === 'BUY') buySignals += synergyBoost;
+            else if (fischerSynergy.signal === 'SELL') sellSignals += synergyBoost;
+            usableIndicators += synergyBoost;
+        } else {
+            signalDetails['FischerSynergy'] = 'HOLD';
         }
 
         const totalIndicators = Math.max(usableIndicators, 1);
@@ -66,6 +97,20 @@ const SignalGenerator = {
             finalSignal = 'SELL';
             confidence = sellStrength;
         }
+
+        // === FISCHER ANTI-FAKE FILTER ===
+        // If signal direction conflicts with synergy direction, reduce confidence
+        // This prevents fake calls where indicators give signal but no structural confirmation
+        if (finalSignal !== 'HOLD' && fischerSynergy && synergyDirection !== 'NEUTRAL') {
+            const signalIsBullish = finalSignal === 'BUY';
+            const synergyIsBullish = synergyDirection === 'BULLISH';
+            
+            if (signalIsBullish !== synergyIsBullish) {
+                // Signal conflicts with Fischer synergy - reduce confidence by 25%
+                // This makes it harder for conflicting signals to meet minConfidence threshold
+                confidence = confidence * 0.75;
+            }
+        }
         
         const signalObj = {
             symbol: symbol,
@@ -77,6 +122,14 @@ const SignalGenerator = {
             holdSignals: holdSignals,
             usableIndicators: usableIndicators,
             details: signalDetails,
+            fischerSynergy: fischerSynergy ? {
+                quality: fischerSynergy.quality,
+                score: fischerSynergy.synergyScore,
+                confirmCount: fischerSynergy.confirmCount,
+                fibLevel: fischerSynergy.fibLevel,
+                priceTarget: fischerSynergy.priceTarget,
+                reason: fischerSynergy.reason
+            } : null,
             timestamp: new Date().toISOString()
         };
         
@@ -123,6 +176,10 @@ const SignalGenerator = {
         if (noSignals) {
             noSignals.remove();
         }
+
+        const synergyInfo = signal.fischerSynergy && signal.fischerSynergy.quality !== 'NONE'
+            ? `<br><strong>Fischer:</strong> ${signal.fischerSynergy.quality} (${signal.fischerSynergy.confirmCount} confirmations, score ${signal.fischerSynergy.score})${signal.fischerSynergy.fibLevel ? ' @ ' + signal.fischerSynergy.fibLevel : ''}${signal.fischerSynergy.priceTarget ? '<br><strong>Target:</strong> ₹' + Number(signal.fischerSynergy.priceTarget.moderate).toFixed(2) : ''}`
+            : '';
         
         const signalCard = document.createElement('div');
         signalCard.className = `signal-card ${signal.signal.toLowerCase()}`;
@@ -133,7 +190,7 @@ const SignalGenerator = {
                 <strong>Buy Signals:</strong> ${signal.buySignals} | 
                 <strong>Sell Signals:</strong> ${signal.sellSignals} | 
                 <strong>Hold:</strong> ${signal.holdSignals} | 
-                <strong>Checked:</strong> ${signal.usableIndicators}<br>
+                <strong>Checked:</strong> ${signal.usableIndicators}${synergyInfo}<br>
                 <strong>Time:</strong> ${new Date(signal.timestamp).toLocaleTimeString()}
             </div>
         `;
