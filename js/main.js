@@ -2407,7 +2407,7 @@ async function runSwingScan() {
     const tradeBlocked = shouldBlockNewOptionSignal(swingBest);
     if (!tradeBlocked) {
         addActiveOptionSignal(swingBest);
-        recordSignalTime(swingBest.symbol, swingBest.side);
+        recordSignalTime(swingBest.symbol, swingBest.side, swingBest.action);
         AngelOneAPI.log(`SWING ${swingSide}: ${swingBest.symbol} ${swingBest.strike} score ${swingBest.score}% (${bestResult.quality}, multi-TF: ${multiTFConfirmed})`);
         TelegramNotifier.sendOptionSignal(swingBest).then(sent => {
             registerOptionTrade(swingBest, { telegramSent: sent });
@@ -2508,7 +2508,7 @@ function updateOptionsTable(optionsData, symbolOverride = null, resolvedExpiryDa
         }
         if (isTradeAlertAction(evaluation.best.action) && !tradeBlocked) {
             AngelOneAPI.log(`${evaluation.best.action}: ${symbol} ${evaluation.best.strike} ${evaluation.best.side} score ${evaluation.best.score}%`);
-            recordSignalTime(evaluation.best.symbol, evaluation.best.side);
+            recordSignalTime(evaluation.best.symbol, evaluation.best.side, evaluation.best.action);
             TelegramNotifier.sendOptionSignal(evaluation.best).then(sent => {
                 registerOptionTrade(evaluation.best, { telegramSent: sent });
             });
@@ -3801,7 +3801,7 @@ async function runMarketWideScan(force = false) {
                     if (!tradeBlocked && (isTradeAlertAction(signal.action) || Config.autoScanner.includeWatchSignals)) {
                         foundSignals.push(signal);
                         addActiveOptionSignal(signal);
-                        recordSignalTime(signal.symbol, signal.side);
+                        recordSignalTime(signal.symbol, signal.side, signal.action);
                     }
                     if (!tradeBlocked && isTradeAlertAction(signal.action)) {
                         const telegramSent = await TelegramNotifier.sendOptionSignal(signal);
@@ -3945,7 +3945,7 @@ async function runBtstBackgroundScan(targets) {
 
             // Signal found! Add to active signals and send to Telegram
             addActiveOptionSignal(btstSignal);
-            recordSignalTime(btstSignal.symbol, btstSignal.side);
+            recordSignalTime(btstSignal.symbol, btstSignal.side, btstSignal.action);
             AngelOneAPI.log(`BTST ${wantedSide}: ${btstSignal.symbol} ${btstSignal.strike} score ${btstSignal.score}% (${bestTF.quality}, 1hr+Daily confirmed)`);
 
             const telegramSent = await TelegramNotifier.sendOptionSignal(btstSignal);
@@ -4602,24 +4602,35 @@ function shouldBlockNewOptionSignal(signal) {
 
     const signalSymbol = String(signal.symbol || '').toUpperCase();
     const signalSide = String(signal.side || '').toUpperCase();
+    const signalAction = String(signal.action || '');
+    const isBtstOrSwing = signalAction.startsWith('BTST') || signalAction.startsWith('SWING');
 
     // FIX: Block ALL calls for same symbol until current call closes
     const openTrade = getOpenOptionTradeForSymbol(signal.symbol);
     if (openTrade) {
-        const sameCall = Number(openTrade.strike) === Number(signal.strike)
-            && String(openTrade.side || '').toUpperCase() === signalSide;
-        if (sameCall) return 'same-open-call';
-        return 'symbol-already-active';
+        // BTST/Swing are separate from intraday - don't block each other
+        const openIsBtst = String(openTrade.action || '').startsWith('BTST') || String(openTrade.action || '').startsWith('SWING');
+        if (isBtstOrSwing !== openIsBtst) {
+            // Different type (intraday vs BTST) - allow both to coexist
+        } else {
+            const sameCall = Number(openTrade.strike) === Number(signal.strike)
+                && String(openTrade.side || '').toUpperCase() === signalSide;
+            if (sameCall) return 'same-open-call';
+            return 'symbol-already-active';
+        }
     }
 
-    // FIX: Block duplicate signals - only ONE signal per symbol+side allowed
-    // If there's already an active signal for same symbol+side (any strike), block new one
+    // FIX: Block duplicate signals - only ONE signal per symbol+side+type allowed
     const activeSignals = getActiveOptionSignals();
-    const existingSignal = activeSignals.find(s =>
-        String(s.symbol || '').toUpperCase() === signalSymbol
-        && String(s.side || '').toUpperCase() === signalSide
-        && isTradeAlertAction(s.action)
-    );
+    const existingSignal = activeSignals.find(s => {
+        const existAction = String(s.action || '');
+        const existIsBtst = existAction.startsWith('BTST') || existAction.startsWith('SWING');
+        // Only compare same type (intraday vs intraday, BTST vs BTST)
+        if (isBtstOrSwing !== existIsBtst) return false;
+        return String(s.symbol || '').toUpperCase() === signalSymbol
+            && String(s.side || '').toUpperCase() === signalSide
+            && isTradeAlertAction(s.action);
+    });
     if (existingSignal) {
         // Allow only if new signal has significantly better score (>10 points)
         const existingScore = Number(existingSignal.score || 0);
@@ -4631,8 +4642,9 @@ function shouldBlockNewOptionSignal(signal) {
         removeActiveSignalByKey(getOptionSignalKey(existingSignal));
     }
 
-    // FIX: Cooldown - block if signal was generated for same symbol+side in last 2 minutes
-    const recentSignalTime = getLastSignalTimeForSymbolSide(signalSymbol, signalSide);
+    // FIX: Cooldown - block if signal was generated for same symbol+side+type in last 2 minutes
+    const cooldownKey = `${signalSymbol}|${signalSide}|${isBtstOrSwing ? 'BTST' : 'INTRA'}`;
+    const recentSignalTime = getLastSignalTimeForSymbolSide(cooldownKey, '');
     if (recentSignalTime && (Date.now() - recentSignalTime) < 120000) {
         return 'cooldown-active';
     }
@@ -4640,14 +4652,18 @@ function shouldBlockNewOptionSignal(signal) {
     return false;
 }
 
-// Track last signal time per symbol+side
+// Track last signal time per symbol+side+type
 const lastSignalTimeMap = {};
-function recordSignalTime(symbol, side) {
-    const key = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}`;
+function recordSignalTime(symbol, side, action) {
+    const isBtst = String(action || '').startsWith('BTST') || String(action || '').startsWith('SWING');
+    const key = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}|${isBtst ? 'BTST' : 'INTRA'}`;
     lastSignalTimeMap[key] = Date.now();
+    // Also record simple key for backward compat
+    const simpleKey = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}`;
+    lastSignalTimeMap[simpleKey] = Date.now();
 }
 function getLastSignalTimeForSymbolSide(symbol, side) {
-    const key = `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}`;
+    const key = side ? `${String(symbol || '').toUpperCase()}|${String(side || '').toUpperCase()}` : String(symbol || '');
     return lastSignalTimeMap[key] || 0;
 }
 
