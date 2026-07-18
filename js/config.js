@@ -31,7 +31,15 @@ const Config = {
         BANKNIFTY: '99926009',
         FINNIFTY: '99926037',
         MIDCPNIFTY: '99926074',
-        SENSEX: '99919000'
+        SENSEX: '99919000',
+        NIFTYIT: '99926008',
+        NIFTYPHARMA: '99926014',
+        NIFTYAUTO: '99926016',
+        NIFTYMETAL: '99926012',
+        NIFTYENERGY: '99926020',
+        NIFTYFMCG: '99926011',
+        NIFTYREALTY: '99926022',
+        NIFTYPSUBANK: '99926034'
     },
 
     indexExchanges: {
@@ -39,7 +47,15 @@ const Config = {
         BANKNIFTY: 'NSE',
         FINNIFTY: 'NSE',
         MIDCPNIFTY: 'NSE',
-        SENSEX: 'BSE'
+        SENSEX: 'BSE',
+        NIFTYIT: 'NSE',
+        NIFTYPHARMA: 'NSE',
+        NIFTYAUTO: 'NSE',
+        NIFTYMETAL: 'NSE',
+        NIFTYENERGY: 'NSE',
+        NIFTYFMCG: 'NSE',
+        NIFTYREALTY: 'NSE',
+        NIFTYPSUBANK: 'NSE'
     },
     
     // Indicator Parameters

@@ -49,7 +49,15 @@ const indexUiMap = {
     BANKNIFTY: 'banknifty',
     SENSEX: 'sensex',
     FINNIFTY: 'finnifty',
-    MIDCPNIFTY: 'midcpnifty'
+    MIDCPNIFTY: 'midcpnifty',
+    NIFTYIT: 'niftyit',
+    NIFTYPHARMA: 'niftypharma',
+    NIFTYAUTO: 'niftyauto',
+    NIFTYMETAL: 'niftymetal',
+    NIFTYENERGY: 'niftyenergy',
+    NIFTYFMCG: 'niftyfmcg',
+    NIFTYREALTY: 'niftyrealty',
+    NIFTYPSUBANK: 'niftypsubank'
 };
 
 const responseSymbolMap = {
@@ -68,7 +76,23 @@ const responseSymbolMap = {
     'NIFTY MID SELECT': 'MIDCPNIFTY',
     'NIFTYMIDSELECT': 'MIDCPNIFTY',
     'NIFTY MIDCAP': 'MIDCPNIFTY',
-    MIDCPNIFTY: 'MIDCPNIFTY'
+    'MIDCPNIFTY': 'MIDCPNIFTY',
+    'NIFTY IT': 'NIFTYIT',
+    'NIFTYIT': 'NIFTYIT',
+    'NIFTY PHARMA': 'NIFTYPHARMA',
+    'NIFTYPHARMA': 'NIFTYPHARMA',
+    'NIFTY AUTO': 'NIFTYAUTO',
+    'NIFTYAUTO': 'NIFTYAUTO',
+    'NIFTY METAL': 'NIFTYMETAL',
+    'NIFTYMETAL': 'NIFTYMETAL',
+    'NIFTY ENERGY': 'NIFTYENERGY',
+    'NIFTYENERGY': 'NIFTYENERGY',
+    'NIFTY FMCG': 'NIFTYFMCG',
+    'NIFTYFMCG': 'NIFTYFMCG',
+    'NIFTY REALTY': 'NIFTYREALTY',
+    'NIFTYREALTY': 'NIFTYREALTY',
+    'NIFTY PSU BANK': 'NIFTYPSUBANK',
+    'NIFTYPSUBANK': 'NIFTYPSUBANK'
 };
 
 const legacyIndexTokenMap = {
@@ -706,6 +730,65 @@ function drawMiniChart(indexKey, symbol) {
 function updateLastUpdateTime() {
     const now = new Date();
     document.getElementById('lastUpdate').textContent = `Last Update: ${now.toLocaleTimeString()}`;
+    updateMarketBreadth();
+}
+
+function updateMarketBreadth() {
+    // Count how many indices are up vs down
+    let indexUp = 0;
+    let indexDown = 0;
+    let stockUp = 0;
+    let stockDown = 0;
+
+    Object.entries(latestChangeBySymbol).forEach(([symbol, changeInfo]) => {
+        if (!changeInfo) return;
+        const points = Number(changeInfo.points || 0);
+        if (indexUiMap[symbol]) {
+            if (points > 0) indexUp++;
+            else if (points < 0) indexDown++;
+        }
+    });
+
+    // For stocks, count from active option signals/scanner results if available
+    const scanResults = document.querySelectorAll('#marketScanResults .signal-card');
+    scanResults.forEach(card => {
+        const text = card.textContent || '';
+        if (/BUY|CALL/i.test(text)) stockUp++;
+        else if (/SELL|PUT/i.test(text)) stockDown++;
+    });
+
+    // If no scan results, estimate from auto-scanner state
+    if (!stockUp && !stockDown && autoScanState.resolvedStocks.length) {
+        autoScanState.resolvedStocks.forEach(stock => {
+            const change = latestChangeBySymbol[stock.symbol];
+            if (change) {
+                if (Number(change.points || 0) > 0) stockUp++;
+                else if (Number(change.points || 0) < 0) stockDown++;
+            }
+        });
+    }
+
+    // Update UI
+    const indexUpEl = document.getElementById('breadthIndexUp');
+    const indexDownEl = document.getElementById('breadthIndexDown');
+    const indexBarEl = document.getElementById('breadthIndexBar');
+    const stockUpEl = document.getElementById('breadthStockUp');
+    const stockDownEl = document.getElementById('breadthStockDown');
+    const stockBarEl = document.getElementById('breadthStockBar');
+
+    if (indexUpEl) indexUpEl.textContent = indexUp;
+    if (indexDownEl) indexDownEl.textContent = indexDown;
+    if (indexBarEl) {
+        const total = indexUp + indexDown;
+        indexBarEl.style.width = total > 0 ? `${(indexUp / total) * 100}%` : '50%';
+    }
+
+    if (stockUpEl) stockUpEl.textContent = stockUp;
+    if (stockDownEl) stockDownEl.textContent = stockDown;
+    if (stockBarEl) {
+        const total = stockUp + stockDown;
+        stockBarEl.style.width = total > 0 ? `${(stockUp / total) * 100}%` : '50%';
+    }
 }
 
 function hasRecentMarketQuote(symbol, maxAgeMs = 15000) {

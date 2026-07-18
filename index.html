@@ -100,13 +100,39 @@
 
     <main class="dashboard" id="dashboard" style="display:none">
 
-        <!-- INDEX CARDS -->
+        <!-- INDEX CARDS - Compact -->
         <section class="index-cards" aria-label="Market indices">
-            <div class="card" id="niftyCard"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="change" id="niftyChange">--</div><div class="ohlc" id="niftyOhlc"></div><canvas class="mini-chart" id="niftyChart" width="200" height="35" aria-label="NIFTY price chart"></canvas></div>
-            <div class="card" id="bankniftyCard"><h3>BANKNIFTY</h3><div class="price" id="bankniftyPrice">--</div><div class="change" id="bankniftyChange">--</div><div class="ohlc" id="bankniftyOhlc"></div><canvas class="mini-chart" id="bankniftyChart" width="200" height="35" aria-label="BANKNIFTY price chart"></canvas></div>
-            <div class="card" id="sensexCard"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="change" id="sensexChange">--</div><div class="ohlc" id="sensexOhlc"></div><canvas class="mini-chart" id="sensexChart" width="200" height="35" aria-label="SENSEX price chart"></canvas></div>
-            <div class="card" id="finniftyCard"><h3>FINNIFTY</h3><div class="price" id="finniftyPrice">--</div><div class="change" id="finniftyChange">--</div><div class="ohlc" id="finniftyOhlc"></div><canvas class="mini-chart" id="finniftyChart" width="200" height="35" aria-label="FINNIFTY price chart"></canvas></div>
-            <div class="card" id="midcpniftyCard"><h3>MIDCAP</h3><div class="price" id="midcpniftyPrice">--</div><div class="change" id="midcpniftyChange">--</div><div class="ohlc" id="midcpniftyOhlc"></div><canvas class="mini-chart" id="midcpniftyChart" width="200" height="35" aria-label="MIDCAP price chart"></canvas></div>
+            <div class="card card-compact" id="niftyCard"><h3>NIFTY 50</h3><div class="price" id="niftyPrice">--</div><div class="change" id="niftyChange">--</div><canvas class="mini-chart" id="niftyChart" width="180" height="30"></canvas><div class="ohlc" id="niftyOhlc"></div></div>
+            <div class="card card-compact" id="bankniftyCard"><h3>BANKNIFTY</h3><div class="price" id="bankniftyPrice">--</div><div class="change" id="bankniftyChange">--</div><canvas class="mini-chart" id="bankniftyChart" width="180" height="30"></canvas><div class="ohlc" id="bankniftyOhlc"></div></div>
+            <div class="card card-compact" id="sensexCard"><h3>SENSEX</h3><div class="price" id="sensexPrice">--</div><div class="change" id="sensexChange">--</div><canvas class="mini-chart" id="sensexChart" width="180" height="30"></canvas><div class="ohlc" id="sensexOhlc"></div></div>
+            <div class="card card-compact" id="finniftyCard"><h3>FINNIFTY</h3><div class="price" id="finniftyPrice">--</div><div class="change" id="finniftyChange">--</div><canvas class="mini-chart" id="finniftyChart" width="180" height="30"></canvas><div class="ohlc" id="finniftyOhlc"></div></div>
+            <div class="card card-compact" id="midcpniftyCard"><h3>MIDCAP</h3><div class="price" id="midcpniftyPrice">--</div><div class="change" id="midcpniftyChange">--</div><canvas class="mini-chart" id="midcpniftyChart" width="180" height="30"></canvas><div class="ohlc" id="midcpniftyOhlc"></div></div>
+            <div class="card card-compact" id="niftyitCard"><h3>IT</h3><div class="price" id="niftyitPrice">--</div><div class="change" id="niftyitChange">--</div><canvas class="mini-chart" id="niftyitChart" width="180" height="30"></canvas><div class="ohlc" id="niftyitOhlc"></div></div>
+            <div class="card card-compact" id="niftypharmaCard"><h3>PHARMA</h3><div class="price" id="niftypharmaPrice">--</div><div class="change" id="niftypharmaChange">--</div><canvas class="mini-chart" id="niftypharmaChart" width="180" height="30"></canvas><div class="ohlc" id="niftypharmaOhlc"></div></div>
+            <div class="card card-compact" id="niftyautoCard"><h3>AUTO</h3><div class="price" id="niftyautoPrice">--</div><div class="change" id="niftyautoChange">--</div><canvas class="mini-chart" id="niftyautoChart" width="180" height="30"></canvas><div class="ohlc" id="niftyautoOhlc"></div></div>
+            <div class="card card-compact" id="niftymetalCard"><h3>METAL</h3><div class="price" id="niftymetalPrice">--</div><div class="change" id="niftymetalChange">--</div><canvas class="mini-chart" id="niftymetalChart" width="180" height="30"></canvas><div class="ohlc" id="niftymetalOhlc"></div></div>
+            <div class="card card-compact" id="niftyenergyCard"><h3>ENERGY</h3><div class="price" id="niftyenergyPrice">--</div><div class="change" id="niftyenergyChange">--</div><canvas class="mini-chart" id="niftyenergyChart" width="180" height="30"></canvas><div class="ohlc" id="niftyenergyOhlc"></div></div>
+            <div class="card card-compact" id="niftyfmcgCard"><h3>FMCG</h3><div class="price" id="niftyfmcgPrice">--</div><div class="change" id="niftyfmcgChange">--</div><canvas class="mini-chart" id="niftyfmcgChart" width="180" height="30"></canvas><div class="ohlc" id="niftyfmcgOhlc"></div></div>
+            <div class="card card-compact" id="niftyrealtyCard"><h3>REALTY</h3><div class="price" id="niftyrealtyPrice">--</div><div class="change" id="niftyrealtyChange">--</div><canvas class="mini-chart" id="niftyrealtyChart" width="180" height="30"></canvas><div class="ohlc" id="niftyrealtyOhlc"></div></div>
+            <div class="card card-compact" id="niftypsubankCard"><h3>PSU BANK</h3><div class="price" id="niftypsubankPrice">--</div><div class="change" id="niftypsubankChange">--</div><canvas class="mini-chart" id="niftypsubankChart" width="180" height="30"></canvas><div class="ohlc" id="niftypsubankOhlc"></div></div>
+        </section>
+
+        <!-- MARKET BREADTH -->
+        <section class="market-breadth" id="marketBreadth" aria-label="Market breadth">
+            <div class="breadth-card">
+                <span class="breadth-label">Indices</span>
+                <span class="breadth-up" id="breadthIndexUp">0</span>
+                <span class="breadth-separator">/</span>
+                <span class="breadth-down" id="breadthIndexDown">0</span>
+                <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthIndexBar" style="width:50%"></span></span>
+            </div>
+            <div class="breadth-card">
+                <span class="breadth-label">Stocks</span>
+                <span class="breadth-up" id="breadthStockUp">0</span>
+                <span class="breadth-separator">/</span>
+                <span class="breadth-down" id="breadthStockDown">0</span>
+                <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthStockBar" style="width:50%"></span></span>
+            </div>
         </section>
 
         <!-- P&L -->
