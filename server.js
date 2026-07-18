@@ -1375,6 +1375,17 @@ function serveStatic(req, res) {
         return;
     }
 
+    // Block direct access to admin.html without secret key
+    if (safePath === '\\admin.html' || safePath === '/admin.html') {
+        const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+        const key = url.searchParams.get('key');
+        if (key !== (process.env.ADMIN_KEY || 'scanner2024')) {
+            res.writeHead(404);
+            res.end('Not found');
+            return;
+        }
+    }
+
     fs.readFile(filePath, (error, data) => {
         if (error) {
             res.writeHead(404);
@@ -1847,7 +1858,7 @@ function readInt64LeSafe(buffer, offset) {
 // ==================== USER AUTHENTICATION ====================
 
 const SESSIONS_FILE = path.join(ROOT, '.cache', 'sessions.json');
-const ADMIN_PASSWORD = 'admin@2024#pro'; // Change this to your admin password
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro'; // Set in Render env vars
 
 function loadUsers() {
     try {
