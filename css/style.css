@@ -127,7 +127,7 @@ body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e
 .button-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* ==================== INDEX CARDS ==================== */
-.index-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.index-cards { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-bottom: 12px; }
 .card { background: #16213e; border: 2px solid #2a2a4a; border-radius: 10px; padding: 12px 10px; text-align: center; transition: border-color 0.3s; }
 .card-compact { padding: 10px 8px; }
 .card-compact h3 { font-size: 11px; margin-bottom: 4px; }
@@ -266,7 +266,7 @@ body { font-family: 'Inter', Arial, sans-serif; background: #1a1a2e; color: #e0e
 
 /* ==================== MOBILE RESPONSIVE ==================== */
 @media (max-width: 1200px) {
-    .index-cards { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .index-cards { grid-template-columns: repeat(4, 1fr); }
     .pnl-summary { grid-template-columns: 1fr 1fr; }
     .history-cards { grid-template-columns: repeat(3, 1fr); }
 }
