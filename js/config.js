@@ -191,11 +191,24 @@ const Config = {
         minAdxForBuy: 18,
         btst: {
             enabled: true,
-            timeframes: ['ONE_DAY'],
-            minConfidence: 82,
-            minTrendStrength: 55,
+            timeframes: ['FIFTEEN_MINUTE', 'ONE_HOUR', 'ONE_DAY'],
+            minConfidence: 72,
+            minTrendStrength: 50,
             minDaysToExpiry: 1.2,
-            maxWarnings: 2
+            maxWarnings: 3
+        },
+        swing: {
+            enabled: true,
+            timeframes: ['FIFTEEN_MINUTE', 'ONE_HOUR', 'ONE_DAY'],
+            minConfidence: 78,
+            minTrendStrength: 55,
+            minDaysToExpiry: 2,
+            maxWarnings: 2,
+            minFischerSynergyScore: 50,
+            minVPAStrength: 60,
+            holdDays: '1-3',
+            requireMultiTimeframeConfirm: true,
+            scanIntervalSeconds: 120
         },
         trendExit: {
             enabled: true,

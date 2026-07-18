@@ -193,9 +193,10 @@
                     <label class="stock-field hidden">Token<input type="text" id="stockToken" placeholder="Angel token" onblur="runMarketWideScan(true)"></label>
                     <label class="commodity-field hidden">Commodity<select id="commoditySelector" onchange="loadOptionsChain(true); runMarketWideScan(true)"><option value="CRUDEOIL">CRUDEOIL</option><option value="NATURALGAS">NATURALGAS</option><option value="GOLD">GOLD</option><option value="SILVER">SILVER</option><option value="COPPER">COPPER</option></select></label>
                     <label>Expiry<select id="expirySelector" onchange="refreshOptionsForSelectedExpiry()"><option value="">Select</option></select></label>
-                    <label>Candle<select id="timeframeSelector" onchange="updateIndicators()"><option value="ONE_MINUTE">1m</option><option value="FIVE_MINUTE" selected>5m</option><option value="FIFTEEN_MINUTE">15m</option><option value="ONE_DAY">1D</option></select></label>
+                    <label>Candle<select id="timeframeSelector" onchange="updateIndicators()"><option value="ONE_MINUTE">1m</option><option value="FIVE_MINUTE" selected>5m</option><option value="FIFTEEN_MINUTE">15m</option><option value="ONE_HOUR">1hr</option><option value="ONE_DAY">1D</option></select></label>
                     <label class="checkbox-label"><input type="checkbox" id="autoRefreshToggle" onchange="toggleOptionAutoRefresh()" checked> Auto</label>
                     <button class="btn btn-small" onclick="refreshOptionsForSelectedExpiry({force:true})">Refresh</button>
+                    <button class="btn btn-small" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000;font-weight:700" onclick="runSwingScan()">Swing Scan</button>
                 </div>
                 <div class="option-summary" id="optionSummary"><div class="summary-title">Best setup will appear after data loads.</div></div>
                 <div class="table-toggle-row"><button class="btn btn-small table-dropdown-toggle" onclick="toggleOptionChainTable()"><span id="optionChainTableArrow">&#9660;</span> Option Chain Table</button></div>

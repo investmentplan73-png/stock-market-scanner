@@ -2229,6 +2229,195 @@ async function refreshOptionsForSelectedExpiry(options = {}) {
     }
 }
 
+// === SWING/BTST SCAN MODE ===
+// Scans on higher timeframes (15min + 1hr) for strong hold calls (1-3 days)
+// Requires Fischer Synergy + VPA + trend all aligned
+async function runSwingScan() {
+    const scanner = getCurrentScanner();
+    const swingSettings = Config.optionScanner.swing || {};
+
+    if (!isMarketOpenForSegment(scanner.segment)) {
+        renderOptionMessage(`${getMarketClosedReason(scanner.segment)}. Swing scan requires live market.`);
+        return;
+    }
+
+    renderOptionMessage('Running Swing Scan (15min + 1hr timeframes)...');
+
+    const resolvedScanner = await resolveScannerTarget(scanner);
+    if (!resolvedScanner.token) {
+        renderOptionMessage('Cannot resolve token for swing scan.');
+        return;
+    }
+
+    let expiryDate = getSelectedExpiryDate();
+    if (!expiryDate) {
+        await populateExpirySelector();
+        expiryDate = getSelectedExpiryDate();
+    }
+
+    // Find an expiry with enough days (swing needs 2+ days to expiry)
+    const minDays = Number(swingSettings.minDaysToExpiry || 2);
+    const daysToExpiry = OptionSignalEngine.getDaysToExpiry(expiryDate);
+    if (daysToExpiry < minDays) {
+        // Try to select next week's expiry
+        const expirySelector = document.getElementById('expirySelector');
+        if (expirySelector) {
+            const options = Array.from(expirySelector.options || []);
+            const farExpiry = options.find(opt => {
+                const d = OptionSignalEngine.getDaysToExpiry(opt.value);
+                return d >= minDays;
+            });
+            if (farExpiry) {
+                expirySelector.value = farExpiry.value;
+                expiryDate = farExpiry.value;
+            }
+        }
+        if (OptionSignalEngine.getDaysToExpiry(expiryDate) < minDays) {
+            renderOptionMessage(`Swing scan needs expiry ${minDays}+ days away. Current expiry too close.`);
+            return;
+        }
+    }
+
+    const spot = await getAutoSpotPrice(resolvedScanner);
+    if (!spot) {
+        renderOptionMessage('Waiting for spot price for swing scan.');
+        return;
+    }
+
+    // Scan on both 15min and 1hr timeframes
+    const timeframes = swingSettings.timeframes || ['FIFTEEN_MINUTE', 'ONE_HOUR'];
+    const swingResults = [];
+
+    for (const tf of timeframes) {
+        try {
+            // Get indicators for this timeframe
+            await ensureAutoIndicators(resolvedScanner, tf);
+            const indicators = latestIndicatorsBySymbol[resolvedScanner.symbol] || {};
+
+            // Check Fischer Synergy for this timeframe
+            const fischerSynergy = indicators.FischerSynergy || TechnicalIndicators.calculateFischerSynergy(indicators);
+            const vpa = indicators.VPA;
+
+            // Only proceed if we have strong structural confirmation
+            const hasStrongTrend = fischerSynergy && fischerSynergy.synergyScore >= (swingSettings.minFischerSynergyScore || 50);
+            const hasVPAConfirm = vpa && vpa.direction !== 'NEUTRAL' && vpa.strength >= (swingSettings.minVPAStrength || 60);
+            const hasTrendAlign = fischerSynergy && fischerSynergy.direction !== 'NEUTRAL';
+
+            if (hasTrendAlign) {
+                swingResults.push({
+                    timeframe: tf,
+                    direction: fischerSynergy.direction,
+                    synergyScore: fischerSynergy.synergyScore || 0,
+                    quality: fischerSynergy.quality || 'STANDARD',
+                    vpaConfirmed: hasVPAConfirm,
+                    strongTrend: hasStrongTrend,
+                    vpaSignal: vpa?.primary?.name || null,
+                    fibLevel: fischerSynergy.fibLevel || null,
+                    confirmCount: fischerSynergy.confirmCount || 0
+                });
+            }
+        } catch (err) {
+            AngelOneAPI.log(`Swing scan ${tf} error: ${err.message}`);
+        }
+    }
+
+    // Check multi-timeframe agreement
+    const bullishTFs = swingResults.filter(r => r.direction === 'BULLISH');
+    const bearishTFs = swingResults.filter(r => r.direction === 'BEARISH');
+    const multiTFConfirmed = bullishTFs.length >= 2 || bearishTFs.length >= 2;
+    const dominantDirection = bullishTFs.length > bearishTFs.length ? 'BULLISH'
+        : bearishTFs.length > bullishTFs.length ? 'BEARISH' : 'NEUTRAL';
+
+    if (dominantDirection === 'NEUTRAL') {
+        renderOptionMessage('Swing Scan: No clear direction on higher timeframes. No swing call.');
+        return;
+    }
+
+    const bestResult = (dominantDirection === 'BULLISH' ? bullishTFs : bearishTFs)
+        .sort((a, b) => b.synergyScore - a.synergyScore)[0];
+
+    const minConfidence = Number(swingSettings.minConfidence || 78);
+
+    // Now get option chain and evaluate with swing bias
+    const data = await AngelOneAPI.getOptionsChain(resolvedScanner, expiryDate, spot);
+    const chain = data?.data;
+    if (!chain || !hasOptionChainRows(chain)) {
+        renderOptionMessage('Swing Scan: No option chain data available.');
+        return;
+    }
+
+    // Force timeframe to 1hr for swing evaluation
+    const swingTimeframe = 'ONE_HOUR';
+    await ensureAutoIndicators(resolvedScanner, swingTimeframe);
+    const swingIndicators = latestIndicatorsBySymbol[resolvedScanner.symbol] || {};
+    const evaluation = OptionSignalEngine.evaluateChain(
+        resolvedScanner.symbol, chain, swingIndicators, spot, { timeframe: swingTimeframe }
+    );
+    evaluation.expiryDate = expiryDate;
+
+    // Filter for swing-worthy calls only
+    const swingSide = dominantDirection === 'BULLISH' ? 'CALL' : 'PUT';
+    const swingCandidates = evaluation.rows
+        .map(row => swingSide === 'CALL' ? row.call : row.put)
+        .filter(item => item.score >= minConfidence && item.action !== 'NO TRADE')
+        .sort((a, b) => b.score - a.score);
+
+    if (!swingCandidates.length) {
+        const msg = `Swing Scan Complete: ${dominantDirection} on ${swingResults.map(r => r.timeframe).join('+')}` +
+            ` (Score: ${bestResult.synergyScore}, ${bestResult.quality})` +
+            ` but no option meets ${minConfidence}% threshold. Try lower expiry or wait.`;
+        renderOptionMessage(msg);
+        return;
+    }
+
+    const swingBest = swingCandidates[0];
+    swingBest.action = `SWING ${swingSide}`;
+    swingBest.expiryDate = expiryDate;
+    swingBest.source = 'Swing Scan';
+    swingBest.segment = scanner.segment;
+
+    // Update summary with swing info
+    const summary = document.getElementById('optionSummary');
+    if (summary) {
+        summary.innerHTML = `
+            <div class="summary-title" style="background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
+                SWING ${swingSide}: ${swingBest.symbol} ${swingBest.strike} ${swingSide} (Hold ${swingSettings.holdDays || '1-3'} days)
+            </div>
+            <div class="summary-grid">
+                <div class="summary-metric">Score<strong>${swingBest.score}%</strong></div>
+                <div class="summary-metric">Entry<strong>${OptionSignalEngine.formatMoney(swingBest.risk.entry)}</strong></div>
+                <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(swingBest.risk.stopLoss)}</strong></div>
+                <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(swingBest.risk.target1)}</strong></div>
+                <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(swingBest.risk.target2)}</strong></div>
+                <div class="summary-metric">T3<strong>${OptionSignalEngine.formatMoney(swingBest.risk.target3 || 0)}</strong></div>
+                <div class="summary-metric">Direction<strong>${dominantDirection}</strong></div>
+                <div class="summary-metric">Synergy<strong>${bestResult.quality} (${bestResult.synergyScore})</strong></div>
+                <div class="summary-metric">Multi-TF<strong>${multiTFConfirmed ? 'Confirmed' : 'Single'}</strong></div>
+                <div class="summary-metric">Expiry<strong>${expiryDate}</strong></div>
+            </div>
+            <div class="summary-reasons">
+                ${swingResults.map(r => `${r.timeframe}: ${r.direction} ${r.quality} score=${r.synergyScore}${r.vpaConfirmed ? ' +VPA' : ''}${r.fibLevel ? ' @' + r.fibLevel : ''}`).join(' | ')}
+            </div>
+        `;
+    }
+
+    // Add as active signal
+    const tradeBlocked = shouldBlockNewOptionSignal(swingBest);
+    if (!tradeBlocked) {
+        addActiveOptionSignal(swingBest);
+        recordSignalTime(swingBest.symbol, swingBest.side);
+        AngelOneAPI.log(`SWING ${swingSide}: ${swingBest.symbol} ${swingBest.strike} score ${swingBest.score}% (${bestResult.quality}, multi-TF: ${multiTFConfirmed})`);
+        TelegramNotifier.sendOptionSignal(swingBest).then(sent => {
+            registerOptionTrade(swingBest, { telegramSent: sent });
+        });
+    } else {
+        AngelOneAPI.log(`Swing signal blocked: ${tradeBlocked}`);
+    }
+
+    // Also show the chain table
+    renderOptionRows(evaluation.rows);
+}
+
 function getSelectedExpiryDate() {
     const expirySelector = document.getElementById('expirySelector');
     if (!expirySelector) return '';
@@ -3347,6 +3536,7 @@ function toggleOptionTradeActions(key) {
 }
 
 function getOptionSignalClass(action) {
+    if (action.startsWith('SWING')) return 'signal-swing';
     if (action.startsWith('BTST')) return 'signal-btst';
     if (action.startsWith('BUY')) return 'signal-buy';
     if (action.startsWith('WATCH')) return 'signal-watch';
@@ -3355,7 +3545,7 @@ function getOptionSignalClass(action) {
 
 function isTradeAlertAction(action) {
     const text = String(action || '');
-    return text.startsWith('BUY') || text.startsWith('BTST');
+    return text.startsWith('BUY') || text.startsWith('BTST') || text.startsWith('SWING');
 }
 
 function renderOptionMessage(message, options = {}) {

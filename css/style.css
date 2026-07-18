@@ -247,6 +247,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .signal-card.buy { border-left-color: #68d391; }
 .signal-card.sell { border-left-color: #fc8181; }
 .signal-card.btst { border-left-color: #fbbf24; }
+.signal-card.swing { border-left-color: #f59e0b; background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(25, 20, 10, 0.8)); }
 .signal-card h4 { font-size: 15px; color: #fff; margin-bottom: 8px; font-weight: 700; }
 .signal-details { font-size: 13px; color: #8899aa; line-height: 1.7; }
 .signal-card-actions { margin-top: 10px; display: flex; gap: 8px; }
@@ -255,6 +256,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .signal { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
 .signal-buy { background: rgba(104, 211, 145, 0.15); color: #68d391; border: 1px solid rgba(104, 211, 145, 0.3); }
 .signal-btst { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+.signal-swing { background: linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(245, 158, 11, 0.12)); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 800; }
 .signal-watch { background: rgba(99, 179, 237, 0.12); color: #63b3ed; border: 1px solid rgba(99, 179, 237, 0.25); }
 .signal-no-trade { background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2); }
 
