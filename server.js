@@ -1860,16 +1860,29 @@ function readInt64LeSafe(buffer, offset) {
 const SESSIONS_FILE = path.join(ROOT, '.cache', 'sessions.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro'; // Set in Render env vars
 
+// In-memory users cache - survives file deletion during same process
+let usersMemoryCache = null;
+
 function loadUsers() {
+    // If we have in-memory cache, use that (survives file issues)
+    if (usersMemoryCache && usersMemoryCache.length) {
+        return usersMemoryCache;
+    }
+
+    // Try file
     try {
         const data = fs.readFileSync(USERS_FILE, 'utf8');
         const users = JSON.parse(data);
-        if (Array.isArray(users) && users.length) return users;
+        if (Array.isArray(users) && users.length) {
+            usersMemoryCache = users;
+            return users;
+        }
     } catch (error) {}
 
-    // If no users file, seed from env var (for Render.com free tier)
+    // Seed from env var (for Render.com free tier - persists across restarts)
     const seedUsers = seedUsersFromEnv();
     if (seedUsers.length) {
+        usersMemoryCache = seedUsers;
         saveUsers(seedUsers);
         return seedUsers;
     }
@@ -1877,13 +1890,14 @@ function loadUsers() {
 }
 
 function seedUsersFromEnv() {
-    // Format: SEED_USERS=email:password:name:days,email2:password2:name2:days2
+    // Format: SEED_USERS=username:password:name:days,username2:password2:name2:days2
     const seed = process.env.SEED_USERS || '';
     if (!seed) return [];
 
     const users = [];
     seed.split(',').forEach(entry => {
-        const [email, password, name, days] = entry.trim().split(':');
+        const parts = entry.trim().split(':');
+        const [email, password, name, days] = parts;
         if (!email || !password) return;
 
         const expiryDate = new Date();
@@ -1891,7 +1905,7 @@ function seedUsersFromEnv() {
 
         users.push({
             id: crypto.randomUUID(),
-            name: name || email.split('@')[0],
+            name: name || email,
             email: email.toLowerCase().trim(),
             mobile: '',
             passwordHash: hashPassword(password),
@@ -1909,11 +1923,18 @@ function seedUsersFromEnv() {
 }
 
 function saveUsers(users) {
+    // Always update memory cache first
+    usersMemoryCache = users;
+
     const dir = path.dirname(USERS_FILE);
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    } catch (e) {
+        console.log('Warning: Could not write users file, using memory cache.');
     }
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
 function loadSessions() {
