@@ -26,12 +26,14 @@ const Config = {
     
     // Index symbol tokens. Angel One moved broad indices to the 999xxxxx
     // AMXIDX token series for market-data APIs.
+    // All F&O tradable indices included.
     indices: {
         NIFTY: '99926000',
         BANKNIFTY: '99926009',
         FINNIFTY: '99926037',
         MIDCPNIFTY: '99926074',
         SENSEX: '99919000',
+        BANKEX: '99919002',
         NIFTYIT: '99926008',
         NIFTYPHARMA: '99926014',
         NIFTYAUTO: '99926016',
@@ -39,7 +41,18 @@ const Config = {
         NIFTYENERGY: '99926020',
         NIFTYFMCG: '99926011',
         NIFTYREALTY: '99926022',
-        NIFTYPSUBANK: '99926034'
+        NIFTYPSUBANK: '99926034',
+        NIFTYINFRA: '99926029',
+        NIFTYPVTBANK: '99926032',
+        NIFTYCPSE: '99926070',
+        NIFTYMEDIA: '99926019',
+        NIFTYHEALTHCARE: '99926068',
+        NIFTYCONSUMER: '99926027',
+        NIFTYOILGAS: '99926080',
+        NIFTYCOMMODITIES: '99926069',
+        NIFTYMNC: '99926030',
+        NIFTYSMLCAP: '99926078',
+        NIFTYNEXT50: '99926013'
     },
 
     indexExchanges: {
@@ -48,6 +61,7 @@ const Config = {
         FINNIFTY: 'NSE',
         MIDCPNIFTY: 'NSE',
         SENSEX: 'BSE',
+        BANKEX: 'BSE',
         NIFTYIT: 'NSE',
         NIFTYPHARMA: 'NSE',
         NIFTYAUTO: 'NSE',
@@ -55,7 +69,18 @@ const Config = {
         NIFTYENERGY: 'NSE',
         NIFTYFMCG: 'NSE',
         NIFTYREALTY: 'NSE',
-        NIFTYPSUBANK: 'NSE'
+        NIFTYPSUBANK: 'NSE',
+        NIFTYINFRA: 'NSE',
+        NIFTYPVTBANK: 'NSE',
+        NIFTYCPSE: 'NSE',
+        NIFTYMEDIA: 'NSE',
+        NIFTYHEALTHCARE: 'NSE',
+        NIFTYCONSUMER: 'NSE',
+        NIFTYOILGAS: 'NSE',
+        NIFTYCOMMODITIES: 'NSE',
+        NIFTYMNC: 'NSE',
+        NIFTYSMLCAP: 'NSE',
+        NIFTYNEXT50: 'NSE'
     },
     
     // Indicator Parameters

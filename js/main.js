@@ -50,6 +50,7 @@ const indexUiMap = {
     SENSEX: 'sensex',
     FINNIFTY: 'finnifty',
     MIDCPNIFTY: 'midcpnifty',
+    BANKEX: 'bankex',
     NIFTYIT: 'niftyit',
     NIFTYPHARMA: 'niftypharma',
     NIFTYAUTO: 'niftyauto',
@@ -57,7 +58,18 @@ const indexUiMap = {
     NIFTYENERGY: 'niftyenergy',
     NIFTYFMCG: 'niftyfmcg',
     NIFTYREALTY: 'niftyrealty',
-    NIFTYPSUBANK: 'niftypsubank'
+    NIFTYPSUBANK: 'niftypsubank',
+    NIFTYINFRA: 'niftyinfra',
+    NIFTYPVTBANK: 'niftypvtbank',
+    NIFTYCPSE: 'niftycpse',
+    NIFTYMEDIA: 'niftymedia',
+    NIFTYHEALTHCARE: 'niftyhealthcare',
+    NIFTYCONSUMER: 'niftyconsumer',
+    NIFTYOILGAS: 'niftyoilgas',
+    NIFTYCOMMODITIES: 'niftycommodities',
+    NIFTYMNC: 'niftymnc',
+    NIFTYSMLCAP: 'niftysmlcap',
+    NIFTYNEXT50: 'niftynext50'
 };
 
 const responseSymbolMap = {
@@ -92,7 +104,37 @@ const responseSymbolMap = {
     'NIFTY REALTY': 'NIFTYREALTY',
     'NIFTYREALTY': 'NIFTYREALTY',
     'NIFTY PSU BANK': 'NIFTYPSUBANK',
-    'NIFTYPSUBANK': 'NIFTYPSUBANK'
+    'NIFTYPSUBANK': 'NIFTYPSUBANK',
+    'BANKEX': 'BANKEX',
+    'BSE BANKEX': 'BANKEX',
+    'NIFTY INFRA': 'NIFTYINFRA',
+    'NIFTYINFRA': 'NIFTYINFRA',
+    'NIFTY PVT BANK': 'NIFTYPVTBANK',
+    'NIFTYPVTBANK': 'NIFTYPVTBANK',
+    'NIFTY PRIVATE BANK': 'NIFTYPVTBANK',
+    'NIFTY CPSE': 'NIFTYCPSE',
+    'NIFTYCPSE': 'NIFTYCPSE',
+    'NIFTY MEDIA': 'NIFTYMEDIA',
+    'NIFTYMEDIA': 'NIFTYMEDIA',
+    'NIFTY HEALTHCARE': 'NIFTYHEALTHCARE',
+    'NIFTYHEALTHCARE': 'NIFTYHEALTHCARE',
+    'NIFTY HEALTH': 'NIFTYHEALTHCARE',
+    'NIFTY CONSUMPTION': 'NIFTYCONSUMER',
+    'NIFTYCONSUMER': 'NIFTYCONSUMER',
+    'NIFTYCONSUMPTION': 'NIFTYCONSUMER',
+    'NIFTY OIL GAS': 'NIFTYOILGAS',
+    'NIFTYOILGAS': 'NIFTYOILGAS',
+    'NIFTY OIL AND GAS': 'NIFTYOILGAS',
+    'NIFTY COMMODITIES': 'NIFTYCOMMODITIES',
+    'NIFTYCOMMODITIES': 'NIFTYCOMMODITIES',
+    'NIFTY MNC': 'NIFTYMNC',
+    'NIFTYMNC': 'NIFTYMNC',
+    'NIFTY SMLCAP 50': 'NIFTYSMLCAP',
+    'NIFTYSMLCAP': 'NIFTYSMLCAP',
+    'NIFTY SMALLCAP': 'NIFTYSMLCAP',
+    'NIFTY NEXT 50': 'NIFTYNEXT50',
+    'NIFTYNEXT50': 'NIFTYNEXT50',
+    'NIFTY JR': 'NIFTYNEXT50'
 };
 
 const legacyIndexTokenMap = {
