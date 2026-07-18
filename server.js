@@ -1863,10 +1863,49 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro'; // Set in
 function loadUsers() {
     try {
         const data = fs.readFileSync(USERS_FILE, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        return [];
+        const users = JSON.parse(data);
+        if (Array.isArray(users) && users.length) return users;
+    } catch (error) {}
+
+    // If no users file, seed from env var (for Render.com free tier)
+    const seedUsers = seedUsersFromEnv();
+    if (seedUsers.length) {
+        saveUsers(seedUsers);
+        return seedUsers;
     }
+    return [];
+}
+
+function seedUsersFromEnv() {
+    // Format: SEED_USERS=email:password:name:days,email2:password2:name2:days2
+    const seed = process.env.SEED_USERS || '';
+    if (!seed) return [];
+
+    const users = [];
+    seed.split(',').forEach(entry => {
+        const [email, password, name, days] = entry.trim().split(':');
+        if (!email || !password) return;
+
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + Number(days || 30));
+
+        users.push({
+            id: crypto.randomUUID(),
+            name: name || email.split('@')[0],
+            email: email.toLowerCase().trim(),
+            mobile: '',
+            passwordHash: hashPassword(password),
+            createdAt: new Date().toISOString(),
+            expiryDate: expiryDate.toISOString(),
+            maxLogins: 2,
+            disabled: false
+        });
+    });
+
+    if (users.length) {
+        console.log(`Seeded ${users.length} user(s) from SEED_USERS env var.`);
+    }
+    return users;
 }
 
 function saveUsers(users) {
@@ -2154,7 +2193,9 @@ function loadAppSettings() {
     try {
         return JSON.parse(fs.readFileSync(APP_SETTINGS_FILE, 'utf8'));
     } catch (e) {
-        return {};
+        // Default: check LOGIN_REQUIRED env var
+        const loginRequired = process.env.LOGIN_REQUIRED !== 'false';
+        return { loginRequired };
     }
 }
 
