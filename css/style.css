@@ -14,17 +14,219 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     padding: 20px;
     position: relative;
     overflow: hidden;
-    background: #0a0e1a;
+    background: #040810;
 }
 
-/* Animated Canvas Background */
-.stock-bg-canvas {
+/* Stock Market Background Scene */
+.stock-bg-scene {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
     z-index: 0;
+    overflow: hidden;
+}
+
+.bg-candle-chart {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.7;
+}
+
+/* Floating Text Labels */
+.bg-float-text {
+    position: absolute;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    text-shadow: 0 0 20px currentColor;
+    animation: floatText 6s ease-in-out infinite;
+    pointer-events: none;
+}
+.text-1 {
+    top: 8%;
+    left: 5%;
+    font-size: 28px;
+    color: #4ade80;
+    animation-delay: 0s;
+}
+.text-2 {
+    top: 12%;
+    right: 5%;
+    font-size: 24px;
+    color: #fbbf24;
+    animation-delay: 1s;
+}
+.text-3 {
+    bottom: 25%;
+    left: 3%;
+    font-size: 20px;
+    color: #63b3ed;
+    animation-delay: 2s;
+}
+.text-4 {
+    top: 30%;
+    right: 8%;
+    font-size: 18px;
+    color: #f87171;
+    animation-delay: 0.5s;
+}
+.text-5 {
+    top: 50%;
+    left: 6%;
+    font-size: 22px;
+    color: #4ade80;
+    animation-delay: 1.5s;
+}
+.text-6 {
+    bottom: 12%;
+    right: 4%;
+    font-size: 26px;
+    color: #a78bfa;
+    animation-delay: 3s;
+}
+.text-7 {
+    bottom: 8%;
+    left: 8%;
+    font-size: 18px;
+    color: #34d399;
+    animation-delay: 2.5s;
+}
+.text-8 {
+    top: 65%;
+    right: 6%;
+    font-size: 20px;
+    color: #fb923c;
+    animation-delay: 4s;
+}
+
+@keyframes floatText {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+}
+
+/* Bull & Bear FIGHT */
+.bg-fight-arena {
+    position: absolute;
+    bottom: 12%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+.bg-bull {
+    font-size: 80px;
+    animation: bullCharge 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(74,222,128,0.7));
+}
+.bg-bear {
+    font-size: 80px;
+    animation: bearPush 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(248,113,113,0.7));
+}
+.fight-sparks {
+    font-size: 40px;
+    animation: sparksFlash 0.8s ease-in-out infinite;
+    filter: drop-shadow(0 0 15px rgba(251,191,36,0.9));
+    margin: 0 -10px;
+}
+.fight-label-green {
+    position: absolute;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-70%);
+    font-size: 14px;
+    font-weight: 900;
+    color: #4ade80;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(74,222,128,0.8);
+    animation: labelPulse 2s ease-in-out infinite;
+    pointer-events: none;
+}
+.fight-label-red {
+    position: absolute;
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(20%);
+    font-size: 14px;
+    font-weight: 900;
+    color: #f87171;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(248,113,113,0.8);
+    animation: labelPulse 2s ease-in-out infinite 1s;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+@keyframes bullCharge {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    30% { transform: translateX(18px) rotate(5deg); }
+    60% { transform: translateX(8px) rotate(-2deg); }
+}
+@keyframes bearPush {
+    0%, 100% { transform: translateX(0) rotate(0deg); }
+    30% { transform: translateX(-18px) rotate(-5deg); }
+    60% { transform: translateX(-8px) rotate(2deg); }
+}
+@keyframes sparksFlash {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.3); }
+}
+@keyframes labelPulse {
+    0%, 100% { opacity: 0.9; }
+    50% { opacity: 0.4; }
+}
+
+/* Arrows */
+.bg-arrow {
+    position: absolute;
+    font-size: 50px;
+    font-weight: 900;
+    pointer-events: none;
+    animation: arrowPulse 2s ease-in-out infinite;
+}
+.arrow-up {
+    top: 20%;
+    left: 20%;
+    color: #4ade80;
+    text-shadow: 0 0 30px rgba(74,222,128,0.8);
+    animation-delay: 0s;
+}
+.arrow-up2 {
+    top: 35%;
+    left: 28%;
+    color: #4ade80;
+    font-size: 36px;
+    text-shadow: 0 0 20px rgba(74,222,128,0.6);
+    animation-delay: 0.5s;
+}
+.arrow-down {
+    top: 25%;
+    right: 20%;
+    color: #f87171;
+    text-shadow: 0 0 30px rgba(248,113,113,0.8);
+    animation-delay: 1s;
+}
+.arrow-down2 {
+    top: 40%;
+    right: 28%;
+    color: #f87171;
+    font-size: 36px;
+    text-shadow: 0 0 20px rgba(248,113,113,0.6);
+    animation-delay: 1.5s;
+}
+
+@keyframes arrowPulse {
+    0%, 100% { opacity: 0.6; transform: translateY(0) scale(1); }
+    50% { opacity: 1; transform: translateY(-8px) scale(1.1); }
 }
 
 /* Semi-transparent overlay for card readability */
@@ -34,7 +236,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     left: 0;
     width: 100%;
     height: 100%;
-    background: radial-gradient(ellipse at center, rgba(10,14,26,0.3) 0%, rgba(10,14,26,0.7) 100%);
+    background: radial-gradient(ellipse at center, rgba(4,8,16,0.4) 0%, rgba(4,8,16,0.75) 100%);
     z-index: 1;
     pointer-events: none;
 }
@@ -42,7 +244,7 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 /* FREE CALLS Badge */
 .free-calls-badge {
     position: absolute;
-    top: 24px;
+    top: 20px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 10;
@@ -53,13 +255,13 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     animation: badgePulse 3s ease-in-out infinite;
 }
 .badge-icon {
-    font-size: 32px;
-    filter: drop-shadow(0 0 8px rgba(74, 222, 128, 0.6));
+    font-size: 36px;
+    filter: drop-shadow(0 0 12px rgba(74, 222, 128, 0.8));
 }
 .badge-text {
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 900;
-    letter-spacing: 3px;
+    letter-spacing: 4px;
     background: linear-gradient(135deg, #4ade80, #fbbf24, #4ade80);
     background-size: 200% auto;
     -webkit-background-clip: text;
@@ -69,16 +271,16 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     text-shadow: none;
 }
 .badge-sub {
-    font-size: 11px;
-    color: rgba(99, 179, 237, 0.8);
-    font-weight: 600;
-    letter-spacing: 1px;
+    font-size: 12px;
+    color: rgba(99, 179, 237, 0.9);
+    font-weight: 700;
+    letter-spacing: 2px;
     text-transform: uppercase;
 }
 
 @keyframes badgePulse {
     0%, 100% { transform: translateX(-50%) scale(1); }
-    50% { transform: translateX(-50%) scale(1.05); }
+    50% { transform: translateX(-50%) scale(1.06); }
 }
 @keyframes shimmerText {
     0% { background-position: 0% center; }
@@ -89,36 +291,36 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .auth-card {
     position: relative;
     z-index: 5;
-    background: linear-gradient(145deg, rgba(18, 24, 45, 0.92) 0%, rgba(13, 18, 33, 0.95) 100%);
-    border: 1px solid rgba(99, 179, 237, 0.2);
+    background: linear-gradient(145deg, rgba(12, 17, 35, 0.95) 0%, rgba(8, 12, 25, 0.97) 100%);
+    border: 1px solid rgba(99, 179, 237, 0.25);
     border-radius: 24px;
-    padding: 40px 32px 28px;
+    padding: 36px 30px 24px;
     width: 100%;
-    max-width: 400px;
+    max-width: 390px;
     box-shadow: 
-        0 25px 80px rgba(0,0,0,0.7),
-        0 0 60px rgba(99, 179, 237, 0.06),
-        inset 0 1px 0 rgba(255,255,255,0.05);
-    backdrop-filter: blur(24px);
-    margin-top: 60px;
+        0 30px 100px rgba(0,0,0,0.8),
+        0 0 80px rgba(99, 179, 237, 0.08),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: blur(30px);
+    margin-top: 70px;
 }
 
 /* Auth Logo */
 .auth-logo {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     display: flex;
     justify-content: center;
 }
 .auth-logo svg {
-    filter: drop-shadow(0 4px 12px rgba(99, 179, 237, 0.3));
+    filter: drop-shadow(0 4px 16px rgba(99, 179, 237, 0.4));
 }
 
 .auth-header {
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 .auth-header h1 {
-    font-size: 22px;
+    font-size: 21px;
     font-weight: 800;
     background: linear-gradient(135deg, #63b3ed, #4fd1c5);
     -webkit-background-clip: text;
@@ -133,9 +335,9 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 
 /* Social Links at Bottom */
 .auth-social-links {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(99, 179, 237, 0.08);
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(99, 179, 237, 0.1);
     text-align: center;
 }
 .social-label {
@@ -155,18 +357,18 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 20px;
+    padding: 10px 22px;
     border-radius: 12px;
     text-decoration: none;
     font-size: 13px;
     font-weight: 700;
     color: #fff;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
 .social-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
 }
 .whatsapp-btn {
     background: linear-gradient(135deg, #25D366, #128C7E);
@@ -466,12 +668,19 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
     .section-body { padding: 0 16px 16px; }
 
     .auth-card { padding: 28px 20px; margin-top: 70px; }
-    .auth-header h1 { font-size: 20px; }
-    .free-calls-badge { top: 16px; }
-    .badge-text { font-size: 16px; letter-spacing: 2px; }
-    .badge-icon { font-size: 26px; }
+    .auth-header h1 { font-size: 18px; }
+    .free-calls-badge { top: 12px; }
+    .badge-text { font-size: 18px; letter-spacing: 2px; }
+    .badge-icon { font-size: 28px; }
     .social-buttons { flex-direction: column; align-items: center; }
     .social-btn { width: 100%; justify-content: center; }
+    .bg-float-text { font-size: 14px !important; }
+    .text-1 { font-size: 18px !important; }
+    .text-2 { font-size: 16px !important; }
+    .bg-bull, .bg-bear { font-size: 50px !important; }
+    .fight-sparks { font-size: 28px; }
+    .bg-arrow { font-size: 32px; }
+    .fight-label-green, .fight-label-red { font-size: 11px; }
 }
 
 @media (max-width: 480px) {
