@@ -3533,10 +3533,19 @@ function toggleMarketWideScan() {
 
 async function runMarketWideScan(force = false) {
     if (!force && (!autoScanState.enabled || autoScanState.running)) return;
-    if (autoScanState.running) return;
+    if (autoScanState.running) {
+        // Safety: if scan has been stuck for >3 minutes, force reset
+        if (autoScanState.startedAt && Date.now() - autoScanState.startedAt > 180000) {
+            AngelOneAPI.log('Auto scanner was stuck for 3+ minutes. Force resetting.');
+            autoScanState.running = false;
+        } else {
+            return;
+        }
+    }
     resetClosedMarketsTradeState();
 
     autoScanState.running = true;
+    autoScanState.startedAt = Date.now();
     updateMarketScannerStatus('Preparing scan...');
 
     const foundSignals = [];
@@ -3550,35 +3559,40 @@ async function runMarketWideScan(force = false) {
         updateText('marketScanCount', String(targets.length));
 
         for (const target of targets) {
-            updateMarketScannerStatus(`Scanning ${target.symbol}...`);
-            const evaluation = await scanAutoTarget(target);
-            scannedCount += 1;
+            try {
+                updateMarketScannerStatus(`Scanning ${target.symbol}...`);
+                const evaluation = await scanAutoTarget(target);
+                scannedCount += 1;
 
-            if (evaluation?.best) {
-                const signal = {
-                    ...evaluation.best,
-                    expiryDate: evaluation.expiryDate || target.expiryDate || '',
-                    source: getTargetSourceLabel(target),
-                    segment: target.segment
-                };
+                if (evaluation?.best) {
+                    const signal = {
+                        ...evaluation.best,
+                        expiryDate: evaluation.expiryDate || target.expiryDate || '',
+                        source: getTargetSourceLabel(target),
+                        segment: target.segment
+                    };
 
-                const tradeBlocked = shouldBlockNewOptionSignal(signal);
-                const blockedByMood = shouldHideByMarketMood(signal, target, marketMood);
-                if (blockedByMood) {
-                    AngelOneAPI.log(`Market mood filter skipped ${signal.symbol} ${signal.side}: ${blockedByMood}`);
-                }
-                if (tradeBlocked) {
-                    AngelOneAPI.log(`Auto scanner skipped ${signal.symbol}: one open call is already active for this stock.`);
-                }
+                    const tradeBlocked = shouldBlockNewOptionSignal(signal);
+                    const blockedByMood = shouldHideByMarketMood(signal, target, marketMood);
+                    if (blockedByMood) {
+                        AngelOneAPI.log(`Market mood filter skipped ${signal.symbol} ${signal.side}: ${blockedByMood}`);
+                    }
+                    if (tradeBlocked) {
+                        AngelOneAPI.log(`Auto scanner skipped ${signal.symbol}: one open call is already active for this stock.`);
+                    }
 
-                if (!tradeBlocked && (isTradeAlertAction(signal.action) || Config.autoScanner.includeWatchSignals)) {
-                    foundSignals.push(signal);
-                    addActiveOptionSignal(signal);
+                    if (!tradeBlocked && (isTradeAlertAction(signal.action) || Config.autoScanner.includeWatchSignals)) {
+                        foundSignals.push(signal);
+                        addActiveOptionSignal(signal);
+                    }
+                    if (!tradeBlocked && isTradeAlertAction(signal.action)) {
+                        const telegramSent = await TelegramNotifier.sendOptionSignal(signal);
+                        registerOptionTrade(signal, { telegramSent });
+                    }
                 }
-                if (!tradeBlocked && isTradeAlertAction(signal.action)) {
-                    const telegramSent = await TelegramNotifier.sendOptionSignal(signal);
-                    registerOptionTrade(signal, { telegramSent });
-                }
+            } catch (targetError) {
+                AngelOneAPI.log(`Auto scanner error on ${target.symbol}: ${targetError.message}`);
+                scannedCount += 1;
             }
 
             if (!isDemoMode) {
@@ -3595,6 +3609,7 @@ async function runMarketWideScan(force = false) {
         AngelOneAPI.log(`Auto scanner error: ${error.message}`);
     } finally {
         autoScanState.running = false;
+        autoScanState.startedAt = 0;
     }
 }
 
@@ -3651,13 +3666,15 @@ async function getMarketScanTargets() {
         }].filter(target => target.token);
     }
 
-    const indexTargets = Object.keys(Config.indices).map(symbol => ({
+    const optionTradableIndices = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+
+    const indexTargets = optionTradableIndices.map(symbol => ({
         segment: 'INDEX',
         symbol,
         token: Config.indices[symbol],
         exchange: getIndexExchange(symbol),
         expiryDate: getUpcomingExpiriesForSymbol(symbol, 1)[0] || selectedExpiryDate || ''
-    }));
+    })).filter(target => target.token);
 
     if (isDemoMode && scope === 'COMMODITIES') {
         return (Config.autoScanner.commoditySymbols || Config.commodityOption.symbols || [])
