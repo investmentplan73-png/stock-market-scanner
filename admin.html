@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Options Signal Scanner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background: #0a0e1a; color: #e8eaf6; font-size: 14px; min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #f59e0b, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px; }
+        h2 { font-size: 18px; font-weight: 700; color: #e8eaf6; margin-bottom: 14px; }
+        .card { background: linear-gradient(145deg, #111827, #0d1221); border: 1px solid rgba(99, 179, 237, 0.08); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+        .login-card { max-width: 400px; margin: 100px auto; }
+        input, select { padding: 10px 14px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(99, 179, 237, 0.12); border-radius: 8px; color: #e8eaf6; font-size: 14px; width: 100%; margin-bottom: 10px; }
+        input:focus { border-color: #63b3ed; outline: none; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, #63b3ed, #4fd1c5); color: #0a0e1a; }
+        .btn-danger { background: linear-gradient(135deg, #fc8181, #f56565); color: #fff; }
+        .btn-warn { background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000; }
+        .btn-small { padding: 6px 12px; font-size: 12px; }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(99, 179, 237, 0.06); border-radius: 12px; padding: 16px; text-align: center; }
+        .stat-card .label { font-size: 11px; color: #6b7b8f; text-transform: uppercase; font-weight: 600; }
+        .stat-card .value { font-size: 28px; font-weight: 800; color: #fff; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: rgba(99, 179, 237, 0.06); padding: 10px 12px; text-align: left; font-weight: 700; color: #8899aa; font-size: 11px; text-transform: uppercase; }
+        td { padding: 10px 12px; border-bottom: 1px solid rgba(99, 179, 237, 0.04); }
+        tr:hover { background: rgba(99, 179, 237, 0.03); }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+        .badge-active { background: rgba(104, 211, 145, 0.15); color: #68d391; }
+        .badge-expired { background: rgba(252, 129, 129, 0.15); color: #fc8181; }
+        .badge-disabled { background: rgba(100, 116, 139, 0.15); color: #94a3b8; }
+        .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 12px; }
+        .form-row input, .form-row select { width: auto; flex: 1; min-width: 120px; margin-bottom: 0; }
+        .error { color: #fc8181; font-size: 13px; margin-top: 8px; }
+        .success { color: #68d391; font-size: 13px; margin-top: 8px; }
+        .hidden { display: none !important; }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+
+<!-- ADMIN LOGIN -->
+<div id="adminLogin" class="login-card card">
+    <h2>Admin Panel Login</h2>
+    <input type="password" id="adminPass" placeholder="Enter Admin Password" onkeydown="if(event.key==='Enter')adminLogin()">
+    <button class="btn btn-primary" onclick="adminLogin()" style="width:100%">Login</button>
+    <p class="error" id="adminError"></p>
+</div>
+
+<!-- ADMIN DASHBOARD -->
+<div id="adminDashboard" class="container hidden">
+    <h1>Admin Panel — Options Signal Scanner</h1>
+
+    <!-- STATS -->
+    <div class="grid" id="statsGrid"></div>
+
+    <!-- CREATE USER -->
+    <div class="card">
+        <h2>Create New User</h2>
+        <div class="form-row">
+            <input type="text" id="newName" placeholder="Full Name">
+            <input type="email" id="newEmail" placeholder="Email">
+            <input type="tel" id="newMobile" placeholder="Mobile (optional)">
+        </div>
+        <div class="form-row">
+            <input type="text" id="newPassword" placeholder="Password">
+            <input type="number" id="newDays" placeholder="Days" value="30" min="1" style="max-width:80px">
+            <input type="number" id="newMaxLogins" placeholder="Max Devices" value="2" min="1" style="max-width:100px">
+            <button class="btn btn-primary" onclick="createUser()">Create User</button>
+        </div>
+        <p id="createMsg"></p>
+    </div>
+
+    <!-- USERS TABLE -->
+    <div class="card">
+        <h2>All Users</h2>
+        <div style="overflow-x:auto">
+            <table id="usersTable">
+                <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Status</th><th>Expiry</th><th>Sessions</th><th>Last Login</th><th>Actions</th></tr></thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ACTIVE SESSIONS -->
+    <div class="card">
+        <h2>Live Sessions</h2>
+        <table id="sessionsTable">
+            <thead><tr><th>User</th><th>Email</th><th>IP</th><th>Login Time</th></tr></thead>
+            <tbody id="sessionsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let adminPassword = '';
+const API = window.location.origin;
+
+function adminLogin() {
+    adminPassword = document.getElementById('adminPass').value;
+    loadDashboard();
+}
+
+async function apiCall(url, data = {}) {
+    const res = await fetch(API + url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, adminPassword })
+    });
+    return res.json();
+}
+
+async function loadDashboard() {
+    const result = await apiCall('/api/admin/users');
+    if (!result.success) {
+        document.getElementById('adminError').textContent = result.message || 'Invalid password';
+        return;
+    }
+    document.getElementById('adminLogin').classList.add('hidden');
+    document.getElementById('adminDashboard').classList.remove('hidden');
+    renderUsers(result.users);
+    loadSessions();
+}
+
+function renderUsers(users) {
+    const total = users.length;
+    const active = users.filter(u => !u.expired && !u.disabled).length;
+    const expired = users.filter(u => u.expired).length;
+    const liveSessions = users.reduce((sum, u) => sum + u.activeSessions, 0);
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-card"><div class="label">Total Users</div><div class="value">${total}</div></div>
+        <div class="stat-card"><div class="label">Active Users</div><div class="value" style="color:#68d391">${active}</div></div>
+        <div class="stat-card"><div class="label">Expired</div><div class="value" style="color:#fc8181">${expired}</div></div>
+        <div class="stat-card"><div class="label">Live Sessions</div><div class="value" style="color:#63b3ed">${liveSessions}</div></div>
+    `;
+
+    const tbody = document.getElementById('usersBody');
+    tbody.innerHTML = users.map(u => {
+        const status = u.disabled ? '<span class="badge badge-disabled">Disabled</span>'
+            : u.expired ? '<span class="badge badge-expired">Expired</span>'
+            : '<span class="badge badge-active">Active</span>';
+        const expiry = u.expiryDate ? new Date(u.expiryDate).toLocaleDateString() : 'No limit';
+        const lastLogin = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never';
+        return `<tr>
+            <td><strong>${esc(u.name)}</strong></td>
+            <td>${esc(u.email)}</td>
+            <td>${esc(u.mobile || '--')}</td>
+            <td>${status}</td>
+            <td>${expiry}</td>
+            <td>${u.activeSessions} / ${u.maxLogins}</td>
+            <td>${lastLogin}<br><small>${esc(u.lastLoginIp || '')}</small></td>
+            <td class="actions">
+                <button class="btn btn-warn btn-small" onclick="extendUser('${u.id}')">+30d</button>
+                <button class="btn btn-small" style="background:#63b3ed;color:#000" onclick="kickUser('${u.id}')">Kick</button>
+                <button class="btn btn-danger btn-small" onclick="deleteUser('${u.id}','${esc(u.email)}')">Delete</button>
+                ${u.disabled ? `<button class="btn btn-small" style="background:#68d391;color:#000" onclick="toggleUser('${u.id}',false)">Enable</button>` : `<button class="btn btn-small" style="background:#94a3b8;color:#000" onclick="toggleUser('${u.id}',true)">Disable</button>`}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function loadSessions() {
+    const result = await apiCall('/api/admin/sessions');
+    if (!result.success) return;
+    const tbody = document.getElementById('sessionsBody');
+    tbody.innerHTML = result.sessions.map(s => `<tr>
+        <td>${esc(s.userName)}</td>
+        <td>${esc(s.userEmail)}</td>
+        <td>${esc(s.ip)}</td>
+        <td>${new Date(s.loginAt).toLocaleString()}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#5a6a7a">No active sessions</td></tr>';
+}
+
+async function createUser() {
+    const name = document.getElementById('newName').value.trim();
+    const email = document.getElementById('newEmail').value.trim();
+    const mobile = document.getElementById('newMobile').value.trim();
+    const password = document.getElementById('newPassword').value.trim();
+    const expiryDays = document.getElementById('newDays').value || 30;
+    const maxLogins = document.getElementById('newMaxLogins').value || 2;
+
+    if (!name || !email || !password) {
+        document.getElementById('createMsg').innerHTML = '<span class="error">Name, email, and password required</span>';
+        return;
+    }
+
+    const result = await apiCall('/api/admin/create-user', { name, email, mobile, password, expiryDays: Number(expiryDays), maxLogins: Number(maxLogins) });
+    document.getElementById('createMsg').innerHTML = result.success
+        ? `<span class="success">${result.message}</span>`
+        : `<span class="error">${result.message}</span>`;
+
+    if (result.success) {
+        document.getElementById('newName').value = '';
+        document.getElementById('newEmail').value = '';
+        document.getElementById('newMobile').value = '';
+        document.getElementById('newPassword').value = '';
+        loadDashboard();
+    }
+}
+
+async function deleteUser(id, email) {
+    if (!confirm(`Delete user ${email}? This cannot be undone.`)) return;
+    await apiCall('/api/admin/delete-user', { userId: id });
+    loadDashboard();
+}
+
+async function extendUser(id) {
+    const days = prompt('Extend by how many days?', '30');
+    if (!days) return;
+    await apiCall('/api/admin/update-user', { userId: id, expiryDays: Number(days) });
+    loadDashboard();
+}
+
+async function kickUser(id) {
+    await apiCall('/api/admin/kick-user', { userId: id });
+    loadDashboard();
+}
+
+async function toggleUser(id, disabled) {
+    await apiCall('/api/admin/update-user', { userId: id, disabled });
+    loadDashboard();
+}
+
+function esc(str) { return String(str || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[c])); }
+</script>
+</body>
+</html>

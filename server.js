@@ -134,8 +134,17 @@ async function handleApi(req, res) {
 
     if (req.method === 'POST' && req.url === '/api/auth/login') {
         const body = await readJson(req);
+        body._clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
         const result = await handleAuthLogin(body);
         sendJson(res, result.success ? 200 : 401, result);
+        return;
+    }
+
+    // Admin routes
+    if (req.method === 'POST' && req.url.startsWith('/api/admin/')) {
+        const body = await readJson(req);
+        const result = await handleAdminRoute(req.url, body);
+        sendJson(res, result.success ? 200 : 403, result);
         return;
     }
 
@@ -1831,6 +1840,9 @@ function readInt64LeSafe(buffer, offset) {
 
 // ==================== USER AUTHENTICATION ====================
 
+const SESSIONS_FILE = path.join(ROOT, '.cache', 'sessions.json');
+const ADMIN_PASSWORD = 'admin@2024#pro'; // Change this to your admin password
+
 function loadUsers() {
     try {
         const data = fs.readFileSync(USERS_FILE, 'utf8');
@@ -1848,6 +1860,23 @@ function saveUsers(users) {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+function loadSessions() {
+    try {
+        const data = fs.readFileSync(SESSIONS_FILE, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        return [];
+    }
+}
+
+function saveSessions(sessions) {
+    const dir = path.dirname(SESSIONS_FILE);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+}
+
 function hashPassword(password) {
     return crypto.createHash('sha256').update(password + 'options-scanner-salt-2024').digest('hex');
 }
@@ -1856,59 +1885,40 @@ function generateToken() {
     return crypto.randomBytes(32).toString('hex');
 }
 
+function isUserExpired(user) {
+    if (!user.expiryDate) return false;
+    const expiry = new Date(user.expiryDate);
+    return expiry < new Date();
+}
+
+function getActiveSessions(userId) {
+    const sessions = loadSessions();
+    const now = Date.now();
+    // Sessions are valid for 24 hours
+    return sessions.filter(s => s.userId === userId && (now - new Date(s.loginAt).getTime()) < 86400000);
+}
+
+function addSession(userId, token, ip) {
+    const sessions = loadSessions();
+    sessions.push({
+        userId,
+        token,
+        ip: ip || 'unknown',
+        loginAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString()
+    });
+    // Keep only last 500 sessions
+    saveSessions(sessions.slice(-500));
+}
+
+function removeSessionsByUser(userId) {
+    const sessions = loadSessions();
+    saveSessions(sessions.filter(s => s.userId !== userId));
+}
+
 async function handleAuthSignup(body) {
-    const name = String(body.name || '').trim();
-    const email = String(body.email || '').trim().toLowerCase();
-    const mobile = String(body.mobile || '').trim();
-    const password = String(body.password || '');
-
-    if (!name || name.length < 2) {
-        return { success: false, message: 'Name must be at least 2 characters' };
-    }
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return { success: false, message: 'Valid email is required' };
-    }
-    if (!mobile || !/^[\+]?[0-9]{10,15}$/.test(mobile.replace(/\s+/g, ''))) {
-        return { success: false, message: 'Valid mobile number is required (10-15 digits)' };
-    }
-    if (!password || password.length < 6) {
-        return { success: false, message: 'Password must be at least 6 characters' };
-    }
-
-    const users = loadUsers();
-
-    // Check if email already exists
-    if (users.find(u => u.email === email)) {
-        return { success: false, message: 'Email is already registered. Please login.' };
-    }
-
-    // Check if mobile already exists
-    const cleanMobile = mobile.replace(/\s+/g, '');
-    if (users.find(u => u.mobile && u.mobile.replace(/\s+/g, '') === cleanMobile)) {
-        return { success: false, message: 'Mobile number is already registered. Please login.' };
-    }
-
-    const newUser = {
-        id: crypto.randomUUID(),
-        name,
-        email,
-        mobile: cleanMobile,
-        passwordHash: hashPassword(password),
-        createdAt: new Date().toISOString()
-    };
-
-    users.push(newUser);
-    saveUsers(users);
-
-    const token = generateToken();
-    console.log(`New user registered: ${email} (${name})`);
-
-    return {
-        success: true,
-        message: 'Account created successfully',
-        user: { id: newUser.id, name: newUser.name, email: newUser.email, mobile: newUser.mobile },
-        token
-    };
+    // Public signup disabled - only admin can create accounts
+    return { success: false, message: 'Signup is disabled. Contact admin on WhatsApp for login access.' };
 }
 
 async function handleAuthLogin(body) {
@@ -1925,15 +1935,40 @@ async function handleAuthLogin(body) {
     );
 
     if (!user) {
-        return { success: false, message: 'No account found with this email/username. Please sign up.' };
+        return { success: false, message: 'No account found. Contact admin for access.' };
     }
 
     if (user.passwordHash !== hashPassword(password)) {
-        return { success: false, message: 'Incorrect password. Please try again.' };
+        return { success: false, message: 'Incorrect password.' };
+    }
+
+    // Check if account is expired
+    if (isUserExpired(user)) {
+        return { success: false, message: 'Your access has expired. Contact admin to renew.' };
+    }
+
+    // Check if account is disabled
+    if (user.disabled) {
+        return { success: false, message: 'Your account is disabled. Contact admin.' };
+    }
+
+    // Check concurrent login limit
+    const maxLogins = Number(user.maxLogins || 2);
+    const activeSessions = getActiveSessions(user.id);
+    if (activeSessions.length >= maxLogins) {
+        return { success: false, message: `Maximum ${maxLogins} devices allowed. Already logged in on ${activeSessions.length} device(s).` };
     }
 
     const token = generateToken();
-    console.log(`User logged in: ${user.email}`);
+    const ip = body._clientIp || 'unknown';
+    addSession(user.id, token, ip);
+
+    // Update last login
+    user.lastLoginAt = new Date().toISOString();
+    user.lastLoginIp = ip;
+    saveUsers(users);
+
+    console.log(`User logged in: ${user.email} from ${ip}`);
 
     return {
         success: true,
@@ -1941,4 +1976,147 @@ async function handleAuthLogin(body) {
         user: { id: user.id, name: user.name, email: user.email, mobile: user.mobile },
         token
     };
+}
+
+// ==================== ADMIN PANEL ROUTES ====================
+
+function isAdminAuth(body) {
+    return String(body.adminPassword || '') === ADMIN_PASSWORD;
+}
+
+async function handleAdminRoute(url, body) {
+    if (!isAdminAuth(body)) {
+        return { success: false, message: 'Invalid admin password' };
+    }
+
+    if (url === '/api/admin/users') {
+        const users = loadUsers();
+        const sessions = loadSessions();
+        const now = Date.now();
+        return {
+            success: true,
+            users: users.map(u => ({
+                id: u.id,
+                name: u.name,
+                email: u.email,
+                mobile: u.mobile,
+                createdAt: u.createdAt,
+                expiryDate: u.expiryDate || null,
+                expired: isUserExpired(u),
+                disabled: u.disabled || false,
+                maxLogins: u.maxLogins || 2,
+                lastLoginAt: u.lastLoginAt || null,
+                lastLoginIp: u.lastLoginIp || null,
+                activeSessions: sessions.filter(s => s.userId === u.id && (now - new Date(s.loginAt).getTime()) < 86400000).length
+            }))
+        };
+    }
+
+    if (url === '/api/admin/create-user') {
+        const name = String(body.name || '').trim();
+        const email = String(body.email || '').trim().toLowerCase();
+        const mobile = String(body.mobile || '').trim();
+        const password = String(body.password || '');
+        const expiryDays = Number(body.expiryDays || 30);
+        const maxLogins = Number(body.maxLogins || 2);
+
+        if (!name || !email || !password) {
+            return { success: false, message: 'Name, email, and password are required' };
+        }
+
+        const users = loadUsers();
+        if (users.find(u => u.email === email)) {
+            return { success: false, message: 'Email already exists' };
+        }
+
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + expiryDays);
+
+        const newUser = {
+            id: crypto.randomUUID(),
+            name,
+            email,
+            mobile: mobile.replace(/\s+/g, ''),
+            passwordHash: hashPassword(password),
+            createdAt: new Date().toISOString(),
+            expiryDate: expiryDate.toISOString(),
+            maxLogins,
+            disabled: false
+        };
+
+        users.push(newUser);
+        saveUsers(users);
+        console.log(`Admin created user: ${email} (expires: ${expiryDate.toDateString()})`);
+
+        return { success: true, message: `User ${email} created. Expires in ${expiryDays} days.`, user: newUser };
+    }
+
+    if (url === '/api/admin/delete-user') {
+        const userId = String(body.userId || '');
+        if (!userId) return { success: false, message: 'User ID required' };
+
+        const users = loadUsers();
+        const index = users.findIndex(u => u.id === userId);
+        if (index === -1) return { success: false, message: 'User not found' };
+
+        const deleted = users.splice(index, 1)[0];
+        saveUsers(users);
+        removeSessionsByUser(userId);
+        console.log(`Admin deleted user: ${deleted.email}`);
+
+        return { success: true, message: `User ${deleted.email} deleted` };
+    }
+
+    if (url === '/api/admin/update-user') {
+        const userId = String(body.userId || '');
+        if (!userId) return { success: false, message: 'User ID required' };
+
+        const users = loadUsers();
+        const user = users.find(u => u.id === userId);
+        if (!user) return { success: false, message: 'User not found' };
+
+        if (body.expiryDays !== undefined) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + Number(body.expiryDays || 30));
+            user.expiryDate = expiryDate.toISOString();
+        }
+        if (body.maxLogins !== undefined) {
+            user.maxLogins = Number(body.maxLogins || 2);
+        }
+        if (body.disabled !== undefined) {
+            user.disabled = Boolean(body.disabled);
+        }
+        if (body.newPassword) {
+            user.passwordHash = hashPassword(body.newPassword);
+        }
+
+        saveUsers(users);
+        return { success: true, message: `User ${user.email} updated` };
+    }
+
+    if (url === '/api/admin/kick-user') {
+        const userId = String(body.userId || '');
+        if (!userId) return { success: false, message: 'User ID required' };
+        removeSessionsByUser(userId);
+        return { success: true, message: 'All sessions cleared for user' };
+    }
+
+    if (url === '/api/admin/sessions') {
+        const sessions = loadSessions();
+        const users = loadUsers();
+        const now = Date.now();
+        const active = sessions
+            .filter(s => (now - new Date(s.loginAt).getTime()) < 86400000)
+            .map(s => {
+                const user = users.find(u => u.id === s.userId);
+                return {
+                    ...s,
+                    userName: user?.name || 'Unknown',
+                    userEmail: user?.email || 'Unknown'
+                };
+            });
+        return { success: true, sessions: active, total: active.length };
+    }
+
+    return { success: false, message: 'Unknown admin route' };
 }
