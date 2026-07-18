@@ -344,6 +344,123 @@ const TechnicalIndicators = {
             addPattern('Bearish Marubozu', 'BEARISH', 72);
         }
 
+        // ==================== NEW CONFIRMED PATTERNS (from Candlestick Charting Explained) ====================
+
+        // HARAMI (Inside Bar) — only valid with trend confirmation
+        const previousBody = Math.abs(previous.close - previous.open);
+        const currentInsidePrevious = current.high <= previous.high && current.low >= previous.low;
+        const bodyInsidePrevious = Math.max(current.open, current.close) <= Math.max(previous.open, previous.close)
+            && Math.min(current.open, current.close) >= Math.min(previous.open, previous.close);
+
+        if (previous.direction === 'BEARISH' && current.direction === 'BULLISH'
+            && bodyInsidePrevious && current.body < previousBody * 0.5
+            && trend === 'DOWN') {
+            addPattern('Bullish Harami', 'BULLISH', 64, 'Inside bar after downtrend');
+        }
+        if (previous.direction === 'BULLISH' && current.direction === 'BEARISH'
+            && bodyInsidePrevious && current.body < previousBody * 0.5
+            && trend === 'UP') {
+            addPattern('Bearish Harami', 'BEARISH', 64, 'Inside bar after uptrend');
+        }
+
+        // TWEEZER TOPS/BOTTOMS — equal highs/lows with reversal confirmation
+        const tweezTolerance = averageRange * 0.03;
+        if (Math.abs(previous.high - current.high) <= tweezTolerance
+            && previous.direction === 'BULLISH' && current.direction === 'BEARISH'
+            && trend === 'UP' && current.close < previous.open) {
+            addPattern('Tweezer Top', 'BEARISH', 70, 'Equal highs + bearish reversal');
+        }
+        if (Math.abs(previous.low - current.low) <= tweezTolerance
+            && previous.direction === 'BEARISH' && current.direction === 'BULLISH'
+            && trend === 'DOWN' && current.close > previous.open) {
+            addPattern('Tweezer Bottom', 'BULLISH', 70, 'Equal lows + bullish reversal');
+        }
+
+        // THREE INSIDE UP/DOWN — Harami + confirmation candle (3-candle pattern)
+        if (rows.length >= 3) {
+            const thirdBodyInsideSecond = Math.max(previous.open, previous.close) <= Math.max(third.open, third.close)
+                && Math.min(previous.open, previous.close) >= Math.min(third.open, third.close);
+
+            if (third.direction === 'BEARISH' && thirdBodyInsideSecond
+                && previous.direction === 'BULLISH' && previous.body < Math.abs(third.close - third.open) * 0.5
+                && current.direction === 'BULLISH' && current.close > third.open) {
+                addPattern('Three Inside Up', 'BULLISH', 80, 'Harami confirmed by 3rd candle');
+            }
+            if (third.direction === 'BULLISH' && thirdBodyInsideSecond
+                && previous.direction === 'BEARISH' && previous.body < Math.abs(third.close - third.open) * 0.5
+                && current.direction === 'BEARISH' && current.close < third.open) {
+                addPattern('Three Inside Down', 'BEARISH', 80, 'Harami confirmed by 3rd candle');
+            }
+        }
+
+        // KICKER PATTERN — strongest reversal (gap + opposite direction)
+        if (previous.direction === 'BEARISH' && current.direction === 'BULLISH'
+            && current.open > previous.open && current.close > previous.open
+            && current.body >= averageBody * 1.2) {
+            addPattern('Bullish Kicker', 'BULLISH', 90, 'Gap up + strong bullish body');
+        }
+        if (previous.direction === 'BULLISH' && current.direction === 'BEARISH'
+            && current.open < previous.open && current.close < previous.open
+            && current.body >= averageBody * 1.2) {
+            addPattern('Bearish Kicker', 'BEARISH', 90, 'Gap down + strong bearish body');
+        }
+
+        // ABANDONED BABY — gap + doji + gap (very rare, very strong)
+        if (rows.length >= 3) {
+            const previousIsDoji = previous.range > 0 && previous.bodyRatio <= 0.12;
+            if (third.direction === 'BEARISH' && previousIsDoji
+                && previous.high < third.low && previous.high < current.low
+                && current.direction === 'BULLISH') {
+                addPattern('Bullish Abandoned Baby', 'BULLISH', 92, 'Gap doji gap — rare reversal');
+            }
+            if (third.direction === 'BULLISH' && previousIsDoji
+                && previous.low > third.high && previous.low > current.high
+                && current.direction === 'BEARISH') {
+                addPattern('Bearish Abandoned Baby', 'BEARISH', 92, 'Gap doji gap — rare reversal');
+            }
+        }
+
+        // BELT HOLD — strong open at extreme with no wick
+        if (current.direction === 'BULLISH' && current.lowerWickRatio <= 0.05
+            && current.body >= averageBody * 1.3 && trend === 'DOWN') {
+            addPattern('Bullish Belt Hold', 'BULLISH', 66, 'Open at low + strong up close');
+        }
+        if (current.direction === 'BEARISH' && current.upperWickRatio <= 0.05
+            && current.body >= averageBody * 1.3 && trend === 'UP') {
+            addPattern('Bearish Belt Hold', 'BEARISH', 66, 'Open at high + strong down close');
+        }
+
+        // SPINNING TOP — indecision, only useful when after strong trend
+        if (current.bodyRatio > 0.12 && current.bodyRatio <= 0.3
+            && current.upperWickRatio >= 0.25 && current.lowerWickRatio >= 0.25
+            && (trend === 'UP' || trend === 'DOWN')) {
+            const spinDir = trend === 'UP' ? 'BEARISH' : 'BULLISH';
+            addPattern('Spinning Top', spinDir, 45, `Indecision after ${trend.toLowerCase()} trend`);
+        }
+
+        // RISING/FALLING THREE METHODS — continuation (needs 5 candles)
+        if (rows.length >= 5) {
+            const five = rows.slice(-5);
+            const firstBig = five[0];
+            const lastBig = five[4];
+            const middleThree = five.slice(1, 4);
+            const middleContained = middleThree.every(c => c.high <= firstBig.high && c.low >= firstBig.low);
+            const middleSmall = middleThree.every(c => c.body < firstBig.body * 0.6);
+
+            if (firstBig.direction === 'BULLISH' && lastBig.direction === 'BULLISH'
+                && lastBig.close > firstBig.close && middleContained && middleSmall
+                && trend === 'UP') {
+                addPattern('Rising Three Methods', 'BULLISH', 76, 'Continuation after pullback');
+            }
+            if (firstBig.direction === 'BEARISH' && lastBig.direction === 'BEARISH'
+                && lastBig.close < firstBig.close && middleContained && middleSmall
+                && trend === 'DOWN') {
+                addPattern('Falling Three Methods', 'BEARISH', 76, 'Continuation after bounce');
+            }
+        }
+
+        // ==================== END NEW PATTERNS ====================
+
         const bullishScore = patterns
             .filter(item => item.direction === 'BULLISH')
             .reduce((max, item) => Math.max(max, item.strength), 0);
