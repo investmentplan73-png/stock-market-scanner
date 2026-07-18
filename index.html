@@ -198,9 +198,9 @@
                     <button class="btn btn-small" onclick="refreshOptionsForSelectedExpiry({force:true})">Refresh</button>
                 </div>
                 <div class="option-summary" id="optionSummary"><div class="summary-title">Best setup will appear after data loads.</div></div>
-                <div class="table-toggle-row"><button class="btn btn-small table-dropdown-toggle" onclick="toggleOptionChainTable()"><span id="optionChainTableArrow">+</span> Option Chain Table</button></div>
-                <div class="options-table hidden" id="optionChainTableWrap">
-                    <table><thead><tr><th>Strike</th><th>Call LTP</th><th>Call Score</th><th>Call Signal</th><th>Put LTP</th><th>Put Score</th><th>Put Signal</th><th>Risk</th></tr></thead><tbody id="optionsTableBody"><tr><td colspan="8">Waiting for data...</td></tr></tbody></table>
+                <div class="table-toggle-row"><button class="btn btn-small table-dropdown-toggle" onclick="toggleOptionChainTable()"><span id="optionChainTableArrow">&#9660;</span> Option Chain Table</button></div>
+                <div class="options-table" id="optionChainTableWrap">
+                    <table><thead><tr><th>Strike</th><th>Call LTP</th><th>Call Score</th><th>Call Signal</th><th>Put LTP</th><th>Put Score</th><th>Put Signal</th><th>Risk Plan</th></tr></thead><tbody id="optionsTableBody"><tr><td colspan="8" style="text-align:center;color:#5a6a7a">Waiting for market data...</td></tr></tbody></table>
                 </div>
             </div>
         </section>

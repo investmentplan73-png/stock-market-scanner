@@ -251,6 +251,13 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .signal-details { font-size: 13px; color: #8899aa; line-height: 1.7; }
 .signal-card-actions { margin-top: 10px; display: flex; gap: 8px; }
 
+/* Option Chain Signal Tags */
+.signal { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+.signal-buy { background: rgba(104, 211, 145, 0.15); color: #68d391; border: 1px solid rgba(104, 211, 145, 0.3); }
+.signal-btst { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+.signal-watch { background: rgba(99, 179, 237, 0.12); color: #63b3ed; border: 1px solid rgba(99, 179, 237, 0.25); }
+.signal-no-trade { background: rgba(100, 116, 139, 0.1); color: #64748b; border: 1px solid rgba(100, 116, 139, 0.2); }
+
 /* ==================== LOG ==================== */
 .log-container { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(99, 179, 237, 0.04); border-radius: 12px; padding: 14px; max-height: 220px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
 .log-entry { padding: 4px 0; color: #6b7b8f; border-bottom: 1px solid rgba(99, 179, 237, 0.03); }

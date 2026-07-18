@@ -2495,27 +2495,42 @@ function renderOptionRows(rows) {
 
     tbody.innerHTML = '';
 
+    if (!rows || !rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#5a6a7a;padding:20px">No option data available</td></tr>';
+        return;
+    }
+
     rows.forEach(row => {
         const callClass = getOptionSignalClass(row.call.action);
         const putClass = getOptionSignalClass(row.put.action);
         const bestRisk = row.call.score >= row.put.score ? row.call.risk : row.put.risk;
         const callToken = escapeHtml(row.call.option.token || '');
         const putToken = escapeHtml(row.put.option.token || '');
+        const callScoreColor = row.call.score >= 75 ? '#68d391' : row.call.score >= 55 ? '#fbbf24' : '#8899aa';
+        const putScoreColor = row.put.score >= 75 ? '#68d391' : row.put.score >= 55 ? '#fbbf24' : '#8899aa';
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${row.strike}</strong></td>
             <td data-option-ltp-token="${callToken}">${OptionSignalEngine.formatMoney(getLiveOptionLtp(row.call.option))}</td>
-            <td>${row.call.score}%<span class="table-note">Vol ${formatCompactNumber(row.call.option.volume)}</span></td>
+            <td><span style="color:${callScoreColor};font-weight:700">${row.call.score}%</span><span class="table-note">Vol ${formatCompactNumber(row.call.option.volume)}</span></td>
             <td><span class="signal ${callClass}">${row.call.action}</span></td>
             <td data-option-ltp-token="${putToken}">${OptionSignalEngine.formatMoney(getLiveOptionLtp(row.put.option))}</td>
-            <td>${row.put.score}%<span class="table-note">Vol ${formatCompactNumber(row.put.option.volume)}</span></td>
+            <td><span style="color:${putScoreColor};font-weight:700">${row.put.score}%</span><span class="table-note">Vol ${formatCompactNumber(row.put.option.volume)}</span></td>
             <td><span class="signal ${putClass}">${row.put.action}</span></td>
             <td>
                 Entry ${OptionSignalEngine.formatMoney(bestRisk.entry)}
                 <span class="table-note">SL ${OptionSignalEngine.formatMoney(bestRisk.stopLoss)} | T1 ${OptionSignalEngine.formatMoney(bestRisk.target1)} | T2 ${OptionSignalEngine.formatMoney(bestRisk.target2)}</span>
             </td>
         `;
+
+        // Highlight BUY rows
+        if (row.call.action.startsWith('BUY') || row.put.action.startsWith('BUY')) {
+            tr.style.background = 'rgba(104, 211, 145, 0.04)';
+        } else if (row.call.action.startsWith('BTST') || row.put.action.startsWith('BTST')) {
+            tr.style.background = 'rgba(251, 191, 36, 0.04)';
+        }
+
         tbody.appendChild(tr);
     });
 }
@@ -4626,7 +4641,7 @@ function setOptionChainTableOpen(isOpen) {
 
     table.classList.toggle('hidden', !isOpen);
     if (toggle) toggle.setAttribute('aria-expanded', String(isOpen));
-    if (arrow) arrow.textContent = isOpen ? '-' : '+';
+    if (arrow) arrow.textContent = isOpen ? '\u25BC' : '\u25B6';
 }
 
 function toggleOptionChainTable() {
