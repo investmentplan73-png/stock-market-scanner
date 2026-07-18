@@ -1047,6 +1047,7 @@ function calculateIndicatorsFromCandles(candles) {
         CandlestickPatterns: TechnicalIndicators.calculateCandlestickPatterns(opens, highs, lows, closes),
         FibonacciContext: TechnicalIndicators.calculateFibonacciContext(highs, lows, closes),
         ChartPatterns: TechnicalIndicators.calculateChartPatterns(highs, lows, closes),
+        VPA: TechnicalIndicators.calculateVPA(opens, highs, lows, closes, volumes),
         MotherVolume: TechnicalIndicators.calculateMotherVolume(
             opens,
             highs,

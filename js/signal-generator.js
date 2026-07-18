@@ -18,6 +18,7 @@ const SignalGenerator = {
         FibonacciContext: 'supportResistance',
         ChartPatterns: 'supportResistance',
         FischerSynergy: 'supportResistance',
+        VPA: 'volume',
         MotherVolume: 'volume',
         PivotPoints: 'pivotPoints'
     },
@@ -109,6 +110,18 @@ const SignalGenerator = {
                 // Signal conflicts with Fischer synergy - reduce confidence by 25%
                 // This makes it harder for conflicting signals to meet minConfidence threshold
                 confidence = confidence * 0.75;
+            }
+        }
+
+        // === VPA FAKE MOVE FILTER ===
+        // Anna Coulling's Effort vs Result: if volume says move is fake, reduce confidence
+        const vpaData = safeIndicators.VPA;
+        if (finalSignal !== 'HOLD' && vpaData && vpaData.isFakeMove) {
+            const vpaAgrees = (finalSignal === 'BUY' && vpaData.direction === 'BULLISH')
+                || (finalSignal === 'SELL' && vpaData.direction === 'BEARISH');
+            if (!vpaAgrees) {
+                // VPA says this is a trap/fake move - reduce confidence by 30%
+                confidence = confidence * 0.70;
             }
         }
         

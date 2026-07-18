@@ -643,6 +643,26 @@ const OptionSignalEngine = {
             }
         }
 
+        // VPA (Volume Price Analysis) confirmation
+        const vpa = indicators.VPA || {};
+        if (vpa.direction === wantedDirection && Number(vpa.strength || 0) >= 62) {
+            score += vpa.strength >= 75 ? 14 : 9;
+            confirmed = true;
+            reasons.push((vpa.primary?.name || 'VPA') + ' confirms ' + side);
+        } else if (vpa.direction === oppositeDirection && Number(vpa.strength || 0) >= 62) {
+            score -= vpa.strength >= 75 ? 16 : 10;
+            warnings.push((vpa.primary?.name || 'VPA') + ' is against trade');
+        }
+        // VPA fake move detection - strongest fake filter
+        if (vpa.isFakeMove) {
+            const vpaAgainstTrade = vpa.direction === oppositeDirection;
+            if (vpaAgainstTrade) {
+                score -= 20;
+                blocked = true;
+                warnings.push('VPA Effort vs Result: fake move detected against trade');
+            }
+        }
+
         return { score, confirmed, blocked };
     },
 

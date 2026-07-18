@@ -1321,6 +1321,245 @@ const TechnicalIndicators = {
         return { k, d };
     },
 
+    // ==================== VOLUME PRICE ANALYSIS (VPA) ENGINE ====================
+    // Based on Anna Coulling's "A Complete Guide to Volume Price Analysis"
+    // Core concept: Volume validates price - high volume = genuine move, low volume = weak/fake move
+    
+    calculateVPA: function(opens, highs, lows, closes, volumes, lookback = 20) {
+        const length = Math.min(
+            opens?.length || 0, highs?.length || 0,
+            lows?.length || 0, closes?.length || 0, volumes?.length || 0
+        );
+        if (length < Math.max(lookback, 8)) return null;
+
+        // Prepare current and recent candle data
+        const idx = length - 1;
+        const currentOpen = Number(opens[idx]);
+        const currentHigh = Number(highs[idx]);
+        const currentLow = Number(lows[idx]);
+        const currentClose = Number(closes[idx]);
+        const currentVolume = Number(volumes[idx]);
+        if (![currentOpen, currentHigh, currentLow, currentClose, currentVolume].every(Number.isFinite)) return null;
+
+        const prevOpen = Number(opens[idx - 1]);
+        const prevHigh = Number(highs[idx - 1]);
+        const prevLow = Number(lows[idx - 1]);
+        const prevClose = Number(closes[idx - 1]);
+        const prevVolume = Number(volumes[idx - 1]);
+
+        // Calculate averages for comparison
+        const recentVolumes = [];
+        const recentSpreads = [];
+        const recentBodies = [];
+        for (let i = Math.max(0, length - lookback - 1); i < idx; i++) {
+            const v = Number(volumes[i]);
+            const h = Number(highs[i]);
+            const l = Number(lows[i]);
+            const o = Number(opens[i]);
+            const c = Number(closes[i]);
+            if (Number.isFinite(v) && Number.isFinite(h) && Number.isFinite(l)) {
+                recentVolumes.push(v);
+                recentSpreads.push(h - l);
+                if (Number.isFinite(o) && Number.isFinite(c)) recentBodies.push(Math.abs(c - o));
+            }
+        }
+        if (recentVolumes.length < 5) return null;
+
+        const avgVolume = recentVolumes.reduce((s, v) => s + v, 0) / recentVolumes.length;
+        const avgSpread = recentSpreads.reduce((s, v) => s + v, 0) / recentSpreads.length;
+        const avgBody = recentBodies.length ? recentBodies.reduce((s, v) => s + v, 0) / recentBodies.length : avgSpread * 0.6;
+
+        // Current candle metrics
+        const spread = currentHigh - currentLow;
+        const body = Math.abs(currentClose - currentOpen);
+        const isBullish = currentClose > currentOpen;
+        const isBearish = currentClose < currentOpen;
+        const volumeRatio = avgVolume > 0 ? currentVolume / avgVolume : 1;
+        const spreadRatio = avgSpread > 0 ? spread / avgSpread : 1;
+        const bodyRatio = avgBody > 0 ? body / avgBody : 1;
+
+        // Close position within the candle (0 = bottom, 100 = top)
+        const closePosition = spread > 0 ? ((currentClose - currentLow) / spread) * 100 : 50;
+
+        const signals = [];
+        let direction = 'NEUTRAL';
+        let strength = 0;
+
+        // === 1. CLIMAX VOLUME (Ultra-high volume + wide spread = reversal warning) ===
+        // Coulling: "Climax volume marks the end of a move"
+        if (volumeRatio >= 2.5 && spreadRatio >= 1.5) {
+            if (isBullish && closePosition >= 60) {
+                // Buying climax at top - potential reversal down
+                signals.push({ name: 'Buying Climax', direction: 'BEARISH', strength: 78, detail: `Vol ${volumeRatio.toFixed(1)}x, spread ${spreadRatio.toFixed(1)}x` });
+            } else if (isBearish && closePosition <= 40) {
+                // Selling climax at bottom - potential reversal up
+                signals.push({ name: 'Selling Climax', direction: 'BULLISH', strength: 78, detail: `Vol ${volumeRatio.toFixed(1)}x, spread ${spreadRatio.toFixed(1)}x` });
+            }
+        }
+
+        // === 2. NO DEMAND BAR (Low volume + narrow up bar = weak buying, bearish) ===
+        // Coulling: "If volume is low on an up bar, there is no demand"
+        if (isBullish && volumeRatio <= 0.6 && spreadRatio <= 0.7 && closePosition <= 55) {
+            signals.push({ name: 'No Demand', direction: 'BEARISH', strength: 62, detail: 'Low vol narrow up bar - weak buying' });
+        }
+
+        // === 3. NO SUPPLY BAR (Low volume + narrow down bar = weak selling, bullish) ===
+        // Coulling: "If volume is low on a down bar, there is no supply"
+        if (isBearish && volumeRatio <= 0.6 && spreadRatio <= 0.7 && closePosition >= 45) {
+            signals.push({ name: 'No Supply', direction: 'BULLISH', strength: 62, detail: 'Low vol narrow down bar - weak selling' });
+        }
+
+        // === 4. STOPPING VOLUME (High volume + narrow spread at bottom = accumulation) ===
+        // Coulling: "Stopping volume halts a down move"
+        const trend = this.inferShortTrend(
+            closes.slice(Math.max(0, length - 8), length).map(Number).filter(Number.isFinite),
+            6
+        );
+
+        if (volumeRatio >= 1.8 && spreadRatio <= 0.6 && trend === 'DOWN') {
+            // High volume but price not dropping further = smart money absorbing
+            if (closePosition >= 40) {
+                signals.push({ name: 'Stopping Volume', direction: 'BULLISH', strength: 74, detail: 'High vol absorbed at support' });
+            }
+        }
+        // Inverse: high volume narrow spread at top in uptrend
+        if (volumeRatio >= 1.8 && spreadRatio <= 0.6 && trend === 'UP') {
+            if (closePosition <= 60) {
+                signals.push({ name: 'Supply Overcoming', direction: 'BEARISH', strength: 74, detail: 'High vol absorbed at resistance' });
+            }
+        }
+
+        // === 5. EFFORT vs RESULT (Most powerful fake detection) ===
+        // Coulling: "If effort (volume) does not match result (price movement), the move is suspect"
+        // High volume but narrow spread = effort without result = TRAP
+        if (volumeRatio >= 1.8 && spreadRatio <= 0.5) {
+            if (isBullish) {
+                // High effort to push up but small result = fake up move / distribution
+                signals.push({ name: 'Effort No Result (Up)', direction: 'BEARISH', strength: 82, detail: 'High vol + tiny up move = TRAP' });
+            } else if (isBearish) {
+                // High effort to push down but small result = fake down move / accumulation
+                signals.push({ name: 'Effort No Result (Down)', direction: 'BULLISH', strength: 82, detail: 'High vol + tiny down move = TRAP' });
+            }
+        }
+        // Low volume but wide spread = no effort with big result = unsustainable
+        if (volumeRatio <= 0.5 && spreadRatio >= 1.5) {
+            if (isBullish) {
+                // Big up move on no volume = not backed, will fade
+                signals.push({ name: 'No Effort Big Result (Up)', direction: 'BEARISH', strength: 68, detail: 'Wide up bar on low vol = unsustainable' });
+            } else if (isBearish) {
+                // Big down move on no volume = panic selling, not genuine
+                signals.push({ name: 'No Effort Big Result (Down)', direction: 'BULLISH', strength: 68, detail: 'Wide down bar on low vol = unsustainable' });
+            }
+        }
+
+        // === 6. ABSORPTION VOLUME (Volume absorbed without price change = strong level) ===
+        // Coulling: "When volume is absorbed, price tests and holds"
+        if (Number.isFinite(prevVolume) && Number.isFinite(prevHigh) && Number.isFinite(prevLow)) {
+            const prevSpread = prevHigh - prevLow;
+            const prevVolumeRatio = avgVolume > 0 ? prevVolume / avgVolume : 1;
+            const twoBarVol = (currentVolume + prevVolume) / 2;
+            const twoBarVolRatio = avgVolume > 0 ? twoBarVol / avgVolume : 1;
+            const priceChange = Math.abs(currentClose - prevClose);
+            const priceChangePercent = prevClose > 0 ? (priceChange / prevClose) * 100 : 0;
+
+            // Two consecutive bars with high volume but price barely moved
+            if (twoBarVolRatio >= 1.6 && priceChangePercent <= 0.15) {
+                if (trend === 'DOWN') {
+                    signals.push({ name: 'Absorption at Support', direction: 'BULLISH', strength: 72, detail: '2-bar high vol, price held = support' });
+                } else if (trend === 'UP') {
+                    signals.push({ name: 'Absorption at Resistance', direction: 'BEARISH', strength: 72, detail: '2-bar high vol, price held = resistance' });
+                }
+            }
+        }
+
+        // === 7. TEST BAR (Pullback on low volume = confirming previous move) ===
+        // Coulling: "A test on low volume confirms the level is genuine"
+        if (volumeRatio <= 0.5 && spreadRatio <= 0.6) {
+            if (trend === 'UP' && isBearish && closePosition >= 50) {
+                // Small pullback on low volume in uptrend = successful test = BUY
+                signals.push({ name: 'Successful Test', direction: 'BULLISH', strength: 70, detail: 'Low vol pullback held = trend continues' });
+            } else if (trend === 'DOWN' && isBullish && closePosition <= 50) {
+                // Small bounce on low volume in downtrend = failed test = SELL
+                signals.push({ name: 'Failed Test', direction: 'BEARISH', strength: 70, detail: 'Low vol bounce failed = trend continues' });
+            }
+        }
+
+        // === ACCUMULATION / DISTRIBUTION DETECTION ===
+        // Check last 5 bars for accumulation (high vol at lows) or distribution (high vol at highs)
+        let accumScore = 0;
+        let distScore = 0;
+        const recentBars = Math.min(5, idx);
+        for (let i = idx - recentBars; i < idx; i++) {
+            const barVol = Number(volumes[i]);
+            const barClose = Number(closes[i]);
+            const barOpen = Number(opens[i]);
+            const barHigh = Number(highs[i]);
+            const barLow = Number(lows[i]);
+            if (![barVol, barClose, barOpen, barHigh, barLow].every(Number.isFinite)) continue;
+
+            const barSpread = barHigh - barLow;
+            const barClosePos = barSpread > 0 ? ((barClose - barLow) / barSpread) * 100 : 50;
+            const barVolRatio = avgVolume > 0 ? barVol / avgVolume : 1;
+
+            // Accumulation: high volume bars closing in upper half during downtrend
+            if (barVolRatio >= 1.3 && barClosePos >= 55 && barClose < barOpen + barSpread * 0.1) {
+                accumScore++;
+            }
+            // Distribution: high volume bars closing in lower half during uptrend
+            if (barVolRatio >= 1.3 && barClosePos <= 45 && barClose > barOpen - barSpread * 0.1) {
+                distScore++;
+            }
+        }
+
+        if (accumScore >= 3 && trend === 'DOWN') {
+            signals.push({ name: 'Accumulation Phase', direction: 'BULLISH', strength: 76, detail: `${accumScore} accumulation bars detected` });
+        }
+        if (distScore >= 3 && trend === 'UP') {
+            signals.push({ name: 'Distribution Phase', direction: 'BEARISH', strength: 76, detail: `${distScore} distribution bars detected` });
+        }
+
+        // === DETERMINE OVERALL VPA DIRECTION ===
+        const bullishSignals = signals.filter(s => s.direction === 'BULLISH');
+        const bearishSignals = signals.filter(s => s.direction === 'BEARISH');
+        const bullishScore = bullishSignals.reduce((max, s) => Math.max(max, s.strength), 0);
+        const bearishScore = bearishSignals.reduce((max, s) => Math.max(max, s.strength), 0);
+
+        if (bullishScore > bearishScore && bullishScore >= 60) {
+            direction = 'BULLISH';
+            strength = bullishScore;
+        } else if (bearishScore > bullishScore && bearishScore >= 60) {
+            direction = 'BEARISH';
+            strength = bearishScore;
+        }
+
+        const primary = signals
+            .filter(s => s.direction === direction || direction === 'NEUTRAL')
+            .sort((a, b) => b.strength - a.strength)[0] || null;
+
+        // Effort vs Result flag - separate output for fake call filtering
+        const effortNoResult = signals.some(s => s.name.startsWith('Effort No Result'));
+        const noEffortBigResult = signals.some(s => s.name.startsWith('No Effort Big Result'));
+        const isFakeMove = effortNoResult || noEffortBigResult;
+
+        return {
+            direction,
+            strength,
+            primary,
+            signals: signals.slice(0, 5),
+            volumeRatio: Number(volumeRatio.toFixed(2)),
+            spreadRatio: Number(spreadRatio.toFixed(2)),
+            closePosition: Number(closePosition.toFixed(1)),
+            trend,
+            isFakeMove,
+            effortNoResult,
+            accumulation: accumScore >= 3,
+            distribution: distScore >= 3,
+            signalCount: signals.length
+        };
+    },
+
+    // ==================== END VPA ENGINE ====================
+
     // ==================== FISCHER SYNERGY ENGINE ====================
     // Based on Robert Fischer's "Candlesticks, Fibonacci, and Chart Pattern Trading Tools"
     // Chapter 6: Merging Fibonacci with Candlesticks and Chart Patterns
@@ -1433,8 +1672,28 @@ const TechnicalIndicators = {
             confirmations.push({ source: 'Momentum', detail: momentumDirection, weight: momentumStrength });
         }
 
+        // === LAYER 6: VPA (Volume Price Analysis) Confirmation ===
+        let vpaConfirm = false;
+        let vpaStrength = 0;
+        let vpaDirection = 'NEUTRAL';
+        const vpa = indicators.VPA;
+        if (vpa && vpa.direction !== 'NEUTRAL' && vpa.strength >= 62) {
+            vpaConfirm = true;
+            vpaDirection = vpa.direction;
+            vpaStrength = Math.min(25, vpa.strength * 0.3);
+            const detail = vpa.primary ? vpa.primary.name : 'VPA Signal';
+            confirmations.push({ source: 'VPA', detail: detail, weight: vpaStrength });
+        }
+
+        // === VPA FAKE MOVE FILTER ===
+        // If VPA detects Effort vs Result mismatch, flag potential fake
+        let vpaFakeWarning = false;
+        if (vpa && vpa.isFakeMove) {
+            vpaFakeWarning = true;
+        }
+
         // === SYNERGY DECISION: Need at least 2 confirmations in same direction ===
-        const confirmCount = [fibConfirm, candleConfirm, chartConfirm, volumeConfirm, momentumConfirm]
+        const confirmCount = [fibConfirm, candleConfirm, chartConfirm, volumeConfirm, momentumConfirm, vpaConfirm]
             .filter(Boolean).length;
 
         if (confirmCount < 2) {
@@ -1476,6 +1735,10 @@ const TechnicalIndicators = {
             if (momentumDirection === 'BULLISH') bullishVotes++;
             else if (momentumDirection === 'BEARISH') bearishVotes++;
         }
+        if (vpaConfirm) {
+            if (vpaDirection === 'BULLISH') bullishVotes++;
+            else if (vpaDirection === 'BEARISH') bearishVotes++;
+        }
 
         // Need clear majority - if split, no signal
         if (bullishVotes === bearishVotes || (bullishVotes === 0 && bearishVotes === 0)) {
@@ -1493,7 +1756,13 @@ const TechnicalIndicators = {
         }
 
         direction = bullishVotes > bearishVotes ? 'BULLISH' : 'BEARISH';
-        synergyScore = fibStrength + candleStrength + chartStrength + volumeStrength + momentumStrength;
+        synergyScore = fibStrength + candleStrength + chartStrength + volumeStrength + momentumStrength + vpaStrength;
+
+        // === VPA FAKE MOVE PENALTY ===
+        // If VPA detects effort-no-result AND direction conflicts with VPA, penalize score
+        if (vpaFakeWarning && vpa && vpa.direction !== 'NEUTRAL' && vpa.direction !== direction) {
+            synergyScore = synergyScore * 0.6; // 40% penalty for potential fake move
+        }
 
         // === FISCHER PRICE TARGET (Dual Ratio Extension) ===
         // Based on Chapter 4: using 0.618 correction x 1.618 extension for target
@@ -1534,13 +1803,17 @@ const TechnicalIndicators = {
 
         // === BONUS: Fischer's 3-level confirmation quality grade ===
         let quality = 'STANDARD';
-        if (fibConfirm && candleConfirm && (chartConfirm || volumeConfirm)) {
+        if (fibConfirm && candleConfirm && (chartConfirm || volumeConfirm || vpaConfirm)) {
             quality = 'HIGH'; // Fibonacci + Candlestick + one more = Fischer's ideal
             synergyScore = Math.min(100, synergyScore * 1.2); // 20% bonus
         }
-        if (fibConfirm && candleConfirm && chartConfirm && volumeConfirm) {
-            quality = 'PREMIUM'; // All 4 confirm = extremely reliable
+        if (fibConfirm && candleConfirm && chartConfirm && (volumeConfirm || vpaConfirm)) {
+            quality = 'PREMIUM'; // 4+ confirm = extremely reliable
             synergyScore = Math.min(100, synergyScore * 1.35); // 35% bonus
+        }
+        if (fibConfirm && candleConfirm && chartConfirm && volumeConfirm && vpaConfirm) {
+            quality = 'ULTRA'; // All 5 confirm including VPA = highest confidence
+            synergyScore = Math.min(100, synergyScore * 1.5); // 50% bonus
         }
 
         const signal = synergyScore >= 45 ? (direction === 'BULLISH' ? 'BUY' : 'SELL') : 'HOLD';
@@ -1758,6 +2031,17 @@ const TechnicalIndicators = {
                 if (!value || !value.signal || value.signal === 'HOLD') return 'HOLD';
                 if (value.synergyScore < 45) return 'HOLD';
                 return value.signal;
+
+            case 'VPA':
+                if (!value || !value.direction || value.direction === 'NEUTRAL') return 'HOLD';
+                if (value.strength < 62) return 'HOLD';
+                // If VPA detects fake move, return opposite to filter it
+                if (value.isFakeMove) {
+                    return value.direction === 'BULLISH' ? 'BUY' : 'SELL';
+                }
+                if (value.direction === 'BULLISH') return 'BUY';
+                if (value.direction === 'BEARISH') return 'SELL';
+                return 'HOLD';
 
             case 'MACD':
                 if (!value || !this.isNumber(value.histogram) || !this.isNumber(value.macd) || !this.isNumber(value.signal)) return 'HOLD';
