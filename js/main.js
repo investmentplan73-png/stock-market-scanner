@@ -2396,6 +2396,8 @@ function renderOptionSummary(evaluation) {
             <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
             <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
             <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
+            <div class="summary-metric">T3<strong>${OptionSignalEngine.formatMoney(best.risk.target3 || 0)}</strong></div>
+            <div class="summary-metric">R:R<strong>${best.risk.riskReward || '--'}</strong></div>
             <div class="summary-metric">Lot<strong>${formatOptionLotSize(best)}</strong></div>
             <div class="summary-metric">Bias<strong>${best.bias.direction}</strong></div>
             <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
@@ -2510,7 +2512,7 @@ function renderOptionRows(rows) {
             <td><span class="signal ${putClass}">${row.put.action}</span></td>
             <td>
                 Entry ${OptionSignalEngine.formatMoney(bestRisk.entry)}
-                <span class="table-note">SL ${OptionSignalEngine.formatMoney(bestRisk.stopLoss)} | T1 ${OptionSignalEngine.formatMoney(bestRisk.target1)}</span>
+                <span class="table-note">SL ${OptionSignalEngine.formatMoney(bestRisk.stopLoss)} | T1 ${OptionSignalEngine.formatMoney(bestRisk.target1)} | T2 ${OptionSignalEngine.formatMoney(bestRisk.target2)}</span>
             </td>
         `;
         tbody.appendChild(tr);
@@ -2756,6 +2758,10 @@ function registerOptionTrade(signal, options = {}) {
         stopLoss: Number(risk.stopLoss || 0),
         target1: Number(risk.target1 || 0),
         target2: Number(risk.target2 || 0),
+        target3: Number(risk.target3 || 0),
+        stopBasis: risk.stopBasis || '',
+        targetBasis: risk.targetBasis || '',
+        riskReward: Number(risk.riskReward || 0),
         openedAt: now,
         updatedAt: now,
         closedAt: '',
@@ -2849,6 +2855,7 @@ function getOptionTradeStatus(trade, ltp, evaluation = null) {
     const stopLoss = Number(trade.stopLoss || 0);
     const target1 = Number(trade.target1 || 0);
     const target2 = Number(trade.target2 || 0);
+    const target3 = Number(trade.target3 || 0);
     // FIX: Increased default confirmations from 1 to 2 - SL hit needs 2 consecutive touches
     const slConfirmations = Math.max(2, Number(Config.optionScanner.stopLoss?.confirmations ?? 2));
 
@@ -2859,6 +2866,7 @@ function getOptionTradeStatus(trade, ltp, evaluation = null) {
     }
 
     trade.slTouches = 0; // Reset on recovery
+    if (target3 > 0 && ltp >= target3) return 'Target 3 Hit';
     if (target2 > 0 && ltp >= target2) return 'Target 2 Hit';
     if (target1 > 0 && ltp >= target1) return 'Target 1 Hit';
     if (isSignalChangedExit(trade, evaluation)) return 'Signal Changed Exit';

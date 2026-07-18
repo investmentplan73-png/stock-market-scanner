@@ -852,6 +852,7 @@ const OptionSignalEngine = {
             side,
             option,
             spotPrice,
+            indicators: safeIndicators,
             levels: safeIndicators.SupportResistance,
             advancedIct: advancedIctContext,
             atr: safeIndicators.ATR,
@@ -1051,7 +1052,7 @@ const OptionSignalEngine = {
 
     createRiskPlan: function(entry, context = {}) {
         if (!entry || entry <= 0) {
-            return { entry: 0, stopLoss: 0, target1: 0, target2: 0, maxLossPercent: 0 };
+            return { entry: 0, stopLoss: 0, target1: 0, target2: 0, target3: 0, maxLossPercent: 0 };
         }
 
         const settings = Config.optionScanner;
@@ -1062,29 +1063,318 @@ const OptionSignalEngine = {
             Number(stopSettings.minRiskPercent || 0),
             maxLossPercent
         );
+
+        // === SMART SL: Multiple methods, pick best confirmed ===
         const optionSupportRisk = this.getOptionSupportRiskAmount(entry, context.option);
         const structureRisk = optionSupportRisk || this.getStructureRiskAmount(entry, context);
+        const fibonacciRisk = this.getFibonacciBasedRisk(entry, context);
+        const vpaRisk = this.getVPABasedRisk(entry, context);
+
         const fallbackRisk = entry * (fallbackRiskPercent / 100);
         const minRisk = entry * (minRiskPercent / 100);
         const maxRisk = entry * (maxLossPercent / 100);
-        const rawRisk = structureRisk?.riskAmount || fallbackRisk;
-        const riskAmount = structureRisk?.basis === 'option-support'
+
+        // Collect all valid SL candidates
+        const slCandidates = [];
+        if (structureRisk?.riskAmount > 0) {
+            slCandidates.push({ amount: structureRisk.riskAmount, basis: structureRisk.basis, confidence: 70 });
+        }
+        if (fibonacciRisk?.riskAmount > 0) {
+            slCandidates.push({ amount: fibonacciRisk.riskAmount, basis: fibonacciRisk.basis, confidence: fibonacciRisk.confidence || 75 });
+        }
+        if (vpaRisk?.riskAmount > 0) {
+            slCandidates.push({ amount: vpaRisk.riskAmount, basis: vpaRisk.basis, confidence: vpaRisk.confidence || 72 });
+        }
+
+        // Pick best SL: prefer highest confidence, then tightest within limits
+        let bestRisk = null;
+        if (slCandidates.length) {
+            // Sort by confidence desc, then by tighter risk
+            slCandidates.sort((a, b) => b.confidence - a.confidence || a.amount - b.amount);
+            bestRisk = slCandidates[0];
+
+            // If multiple methods agree on similar SL, boost confidence (confirmed SL)
+            if (slCandidates.length >= 2) {
+                const tolerance = entry * 0.05; // 5% tolerance
+                const firstTwo = slCandidates.slice(0, 2);
+                if (Math.abs(firstTwo[0].amount - firstTwo[1].amount) <= tolerance) {
+                    bestRisk.basis = 'confirmed-' + firstTwo[0].basis + '+' + firstTwo[1].basis;
+                    bestRisk.confidence = Math.min(95, bestRisk.confidence + 15);
+                }
+            }
+        }
+
+        const rawRisk = bestRisk?.amount || structureRisk?.riskAmount || fallbackRisk;
+        const riskAmount = bestRisk?.basis?.startsWith('option-support')
             ? Math.min(rawRisk, maxRisk)
             : Math.max(minRisk, Math.min(rawRisk, maxRisk));
         const stopLoss = Math.max(entry - riskAmount, 0.05);
-        const target1 = entry + (riskAmount * settings.firstTargetRiskReward);
-        const target2 = entry + (riskAmount * settings.secondTargetRiskReward);
+
+        // === SMART TARGETS: Fibonacci + Resistance based ===
+        const smartTargets = this.getSmartTargets(entry, riskAmount, context);
+        const target1 = smartTargets.target1;
+        const target2 = smartTargets.target2;
+        const target3 = smartTargets.target3;
 
         return {
             entry,
             stopLoss,
             target1,
             target2,
+            target3,
             maxLossPercent,
-            stopBasis: structureRisk?.basis || 'option-risk',
+            stopBasis: bestRisk?.basis || structureRisk?.basis || 'option-risk',
+            stopConfidence: bestRisk?.confidence || 50,
             optionSupport: optionSupportRisk?.optionSupport || null,
-            underlyingStop: structureRisk?.underlyingStop || null
+            underlyingStop: structureRisk?.underlyingStop || null,
+            targetBasis: smartTargets.basis || 'risk-reward',
+            riskReward: riskAmount > 0 ? Number(((target1 - entry) / riskAmount).toFixed(2)) : 0
         };
+    },
+
+    // Fibonacci-based SL: use nearest Fibonacci retracement below entry as stop
+    getFibonacciBasedRisk: function(entry, context = {}) {
+        const { indicators, side, spotPrice } = context;
+        if (!indicators) return null;
+
+        const fib = indicators.FibonacciContext;
+        const fischerTargets = indicators.FischerDualRatio;
+        if (!fib || !TechnicalIndicators.isNumber(fib.swingHigh) || !TechnicalIndicators.isNumber(fib.swingLow)) return null;
+
+        const spot = Number(spotPrice || fib.currentPrice || 0);
+        if (!spot) return null;
+
+        const isCall = side === 'CALL';
+        const range = fib.swingHigh - fib.swingLow;
+        if (range <= 0) return null;
+
+        // For CALL: SL below nearest Fibonacci support level
+        // For PUT: SL above nearest Fibonacci resistance level
+        const retracements = fib.retracements || {};
+        const levels = Object.entries(retracements)
+            .map(([ratio, value]) => ({ ratio: Number(ratio), value: Number(value) }))
+            .filter(l => TechnicalIndicators.isNumber(l.value));
+
+        let fibStop = null;
+        let confidence = 70;
+
+        if (isCall) {
+            // Find highest Fibonacci level BELOW current spot
+            const supports = levels
+                .filter(l => l.value < spot)
+                .sort((a, b) => b.value - a.value);
+            if (supports.length) {
+                fibStop = supports[0].value;
+                // 61.8% and 50% are strongest support = higher confidence
+                if (supports[0].ratio >= 0.5 && supports[0].ratio <= 0.618) confidence = 85;
+                else if (supports[0].ratio === 0.382) confidence = 78;
+            }
+        } else {
+            // For PUT: find lowest Fibonacci level ABOVE current spot
+            const resistances = levels
+                .filter(l => l.value > spot)
+                .sort((a, b) => a.value - b.value);
+            if (resistances.length) {
+                fibStop = resistances[0].value;
+                if (resistances[0].ratio >= 0.5 && resistances[0].ratio <= 0.618) confidence = 85;
+                else if (resistances[0].ratio === 0.382) confidence = 78;
+            }
+        }
+
+        if (!TechnicalIndicators.isNumber(fibStop)) return null;
+
+        // In golden zone = highest confidence
+        if (fib.inGoldenZone) confidence = Math.min(95, confidence + 10);
+
+        // Convert underlying stop to option risk using delta
+        const delta = Math.abs(Number(context.greeks?.delta || 0.45));
+        const effectiveDelta = Math.max(delta, 0.25);
+        const underlyingRisk = isCall ? (spot - fibStop) : (fibStop - spot);
+        if (underlyingRisk <= 0) return null;
+
+        const buffer = spot * 0.001; // Small buffer below fib level
+        const riskAmount = Math.min(entry * 0.85, (underlyingRisk + buffer) * effectiveDelta);
+        if (!Number.isFinite(riskAmount) || riskAmount <= 0) return null;
+
+        return {
+            riskAmount,
+            fibStop,
+            basis: `fib-${isCall ? 'support' : 'resistance'}`,
+            confidence
+        };
+    },
+
+    // VPA-based SL: use volume absorption levels and stopping volume as stops
+    getVPABasedRisk: function(entry, context = {}) {
+        const { indicators, side, spotPrice } = context;
+        if (!indicators) return null;
+
+        const vpa = indicators.VPA;
+        const levels = indicators.SupportResistance;
+        if (!vpa) return null;
+
+        const spot = Number(spotPrice || levels?.currentPrice || 0);
+        if (!spot) return null;
+
+        const isCall = side === 'CALL';
+        let confidence = 65;
+        let vpaStop = null;
+
+        // VPA Stopping Volume = strong support/resistance confirmed by volume
+        if (vpa.primary) {
+            if (isCall && (vpa.primary.name === 'Stopping Volume' || vpa.primary.name === 'Absorption at Support')) {
+                // Recent candle low is volume-confirmed support
+                confidence = 80;
+            } else if (!isCall && (vpa.primary.name === 'Supply Overcoming' || vpa.primary.name === 'Absorption at Resistance')) {
+                confidence = 80;
+            }
+        }
+
+        // If VPA shows accumulation, SL should be below recent low (smart money buying there)
+        if (isCall && vpa.accumulation) {
+            confidence = Math.min(88, confidence + 12);
+        }
+        if (!isCall && vpa.distribution) {
+            confidence = Math.min(88, confidence + 12);
+        }
+
+        // Use S/R levels confirmed by VPA as stop
+        if (levels) {
+            if (isCall && levels.support && TechnicalIndicators.isNumber(levels.support.value)) {
+                vpaStop = levels.support.value;
+                // Multi-touch support with VPA confirmation = very reliable
+                if (levels.support.touches >= 2) confidence = Math.min(92, confidence + 8);
+            } else if (!isCall && levels.resistance && TechnicalIndicators.isNumber(levels.resistance.value)) {
+                vpaStop = levels.resistance.value;
+                if (levels.resistance.touches >= 2) confidence = Math.min(92, confidence + 8);
+            }
+        }
+
+        if (!TechnicalIndicators.isNumber(vpaStop)) return null;
+
+        const delta = Math.abs(Number(context.greeks?.delta || 0.45));
+        const effectiveDelta = Math.max(delta, 0.25);
+        const underlyingRisk = isCall ? (spot - vpaStop) : (vpaStop - spot);
+        if (underlyingRisk <= 0) return null;
+
+        const riskAmount = Math.min(entry * 0.85, underlyingRisk * effectiveDelta);
+        if (!Number.isFinite(riskAmount) || riskAmount <= 0) return null;
+
+        return {
+            riskAmount,
+            vpaStop,
+            basis: 'vpa-confirmed',
+            confidence
+        };
+    },
+
+    // Smart Targets: use Fibonacci extensions + Resistance levels instead of fixed R:R
+    getSmartTargets: function(entry, riskAmount, context = {}) {
+        const { indicators, side, spotPrice } = context;
+        const settings = Config.optionScanner;
+
+        // Fallback: fixed R:R targets
+        const fallbackT1 = entry + (riskAmount * settings.firstTargetRiskReward);
+        const fallbackT2 = entry + (riskAmount * settings.secondTargetRiskReward);
+        const fallbackT3 = entry + (riskAmount * (settings.secondTargetRiskReward * 1.5));
+
+        if (!indicators || !spotPrice) {
+            return { target1: fallbackT1, target2: fallbackT2, target3: fallbackT3, basis: 'risk-reward' };
+        }
+
+        const fib = indicators.FibonacciContext;
+        const levels = indicators.SupportResistance;
+        const fischer = indicators.FischerSynergy;
+        const isCall = side === 'CALL';
+        const spot = Number(spotPrice || 0);
+        const delta = Math.abs(Number(context.greeks?.delta || 0.45));
+        const effectiveDelta = Math.max(delta, 0.25);
+
+        const targetCandidates = [];
+        let basis = 'risk-reward';
+
+        // === Fibonacci Extension Targets ===
+        if (fib && fib.extensions) {
+            const extensions = Object.entries(fib.extensions)
+                .map(([ratio, value]) => ({ ratio: Number(ratio), value: Number(value) }))
+                .filter(l => TechnicalIndicators.isNumber(l.value));
+
+            extensions.forEach(ext => {
+                if (isCall && ext.value > spot) {
+                    const move = (ext.value - spot) * effectiveDelta;
+                    targetCandidates.push({ price: entry + move, source: `Fib ${ext.ratio}x`, priority: ext.ratio >= 1.618 ? 2 : 1 });
+                } else if (!isCall && ext.value < spot) {
+                    const move = (spot - ext.value) * effectiveDelta;
+                    targetCandidates.push({ price: entry + move, source: `Fib ${ext.ratio}x`, priority: ext.ratio >= 1.618 ? 2 : 1 });
+                }
+            });
+        }
+
+        // === Resistance/Support Level Targets ===
+        if (levels) {
+            if (isCall && levels.resistances) {
+                levels.resistances.forEach((r, i) => {
+                    if (TechnicalIndicators.isNumber(r.value) && r.value > spot) {
+                        const move = (r.value - spot) * effectiveDelta;
+                        targetCandidates.push({ price: entry + move, source: `Resistance ${i + 1}`, priority: i === 0 ? 1 : 2 });
+                    }
+                });
+            } else if (!isCall && levels.supports) {
+                levels.supports.forEach((s, i) => {
+                    if (TechnicalIndicators.isNumber(s.value) && s.value < spot) {
+                        const move = (spot - s.value) * effectiveDelta;
+                        targetCandidates.push({ price: entry + move, source: `Support ${i + 1}`, priority: i === 0 ? 1 : 2 });
+                    }
+                });
+            }
+        }
+
+        // === Fischer Synergy Price Targets ===
+        if (fischer && fischer.priceTarget) {
+            const ft = fischer.priceTarget;
+            if (TechnicalIndicators.isNumber(ft.moderate)) {
+                const move = Math.abs(ft.moderate - spot) * effectiveDelta;
+                if (move > 0) targetCandidates.push({ price: entry + move, source: 'Fischer Moderate', priority: 2 });
+            }
+            if (TechnicalIndicators.isNumber(ft.aggressive)) {
+                const move = Math.abs(ft.aggressive - spot) * effectiveDelta;
+                if (move > 0) targetCandidates.push({ price: entry + move, source: 'Fischer Aggressive', priority: 3 });
+            }
+        }
+
+        // Filter only targets above entry and sort by price
+        const validTargets = targetCandidates
+            .filter(t => t.price > entry + (riskAmount * 0.5)) // At least 0.5R reward
+            .sort((a, b) => a.price - b.price);
+
+        if (validTargets.length >= 2) {
+            basis = 'fibonacci+structure';
+            // T1 = nearest structure target (conservative)
+            // T2 = next target or Fib 1.618 extension
+            // T3 = furthest target (aggressive)
+            const t1 = validTargets[0].price;
+            const t2 = validTargets[Math.min(1, validTargets.length - 1)].price;
+            const t3 = validTargets[Math.min(2, validTargets.length - 1)].price;
+
+            return {
+                target1: Math.max(t1, fallbackT1 * 0.8), // Don't go below 80% of fallback
+                target2: Math.max(t2, fallbackT2 * 0.8),
+                target3: Math.max(t3, fallbackT2),
+                basis,
+                targetDetails: validTargets.slice(0, 3).map(t => t.source)
+            };
+        } else if (validTargets.length === 1) {
+            basis = 'structure+rr';
+            return {
+                target1: Math.max(validTargets[0].price, fallbackT1 * 0.8),
+                target2: fallbackT2,
+                target3: fallbackT3,
+                basis,
+                targetDetails: [validTargets[0].source]
+            };
+        }
+
+        return { target1: fallbackT1, target2: fallbackT2, target3: fallbackT3, basis: 'risk-reward' };
     },
 
     getOptionSupportRiskAmount: function(entry, option = {}) {

@@ -391,11 +391,14 @@ const TelegramNotifier = {
             signal.expiryDate ? `Expiry: ${signal.expiryDate}` : '',
             `Confidence: ${signal.score}%`,
             `Entry: ${OptionSignalEngine.formatMoney(risk.entry)}`,
-            `SL: ${OptionSignalEngine.formatMoney(risk.stopLoss)}`,
-            risk.optionSupport ? `Option Support: ${OptionSignalEngine.formatMoney(risk.optionSupport)} (${risk.stopBasis})` : '',
+            `SL: ${OptionSignalEngine.formatMoney(risk.stopLoss)}${risk.stopBasis ? ' (' + risk.stopBasis + ')' : ''}`,
+            risk.optionSupport ? `Option Support: ${OptionSignalEngine.formatMoney(risk.optionSupport)}` : '',
             `Lot Size: ${typeof formatOptionLotSize === 'function' ? formatOptionLotSize(signal) : (signal.option?.lotSize || signal.option?.lotsize || '--')}`,
             `Target 1: ${OptionSignalEngine.formatMoney(risk.target1)}`,
-            `Target 2: ${OptionSignalEngine.formatMoney(risk.target2)}`
+            `Target 2: ${OptionSignalEngine.formatMoney(risk.target2)}`,
+            risk.target3 ? `Target 3: ${OptionSignalEngine.formatMoney(risk.target3)}` : '',
+            risk.riskReward ? `R:R ${risk.riskReward}` : '',
+            risk.targetBasis && risk.targetBasis !== 'risk-reward' ? `Basis: ${risk.targetBasis}` : ''
         ].filter(Boolean).join('\n');
     },
 
@@ -409,6 +412,7 @@ const TelegramNotifier = {
             `SL: ${OptionSignalEngine.formatMoney(trade.stopLoss)}`,
             `Target 1: ${OptionSignalEngine.formatMoney(trade.target1)}`,
             `Target 2: ${OptionSignalEngine.formatMoney(trade.target2)}`,
+            trade.target3 ? `Target 3: ${OptionSignalEngine.formatMoney(trade.target3)}` : '',
             'This side is unlocked for the next fresh signal.'
         ].filter(Boolean).join('\n');
     }
