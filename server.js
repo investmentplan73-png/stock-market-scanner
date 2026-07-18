@@ -2077,12 +2077,12 @@ async function handleAdminRoute(url, body) {
         const maxLogins = Number(body.maxLogins || 2);
 
         if (!name || !email || !password) {
-            return { success: false, message: 'Name, email, and password are required' };
+            return { success: false, message: 'Name, username, and password are required' };
         }
 
         const users = loadUsers();
         if (users.find(u => u.email === email)) {
-            return { success: false, message: 'Email already exists' };
+            return { success: false, message: 'Username already exists' };
         }
 
         const expiryDate = new Date();

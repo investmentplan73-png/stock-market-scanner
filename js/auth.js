@@ -193,3 +193,58 @@ function handleLogout() {
 document.addEventListener('DOMContentLoaded', function() {
     Auth.init();
 });
+
+// Toggle login requirement from inside the app
+async function toggleLoginFromApp() {
+    const adminPass = prompt('Enter Admin Password to toggle login:');
+    if (!adminPass) return;
+
+    try {
+        // First check current status
+        const settingsRes = await fetch(`${Auth.getProxyBase()}/api/admin/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminPassword: adminPass })
+        });
+        const settings = await settingsRes.json();
+        if (!settings.success) {
+            alert('Wrong admin password!');
+            return;
+        }
+
+        const currentStatus = settings.loginRequired !== false;
+        const newStatus = !currentStatus;
+
+        const res = await fetch(`${Auth.getProxyBase()}/api/admin/toggle-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ adminPassword: adminPass, enabled: newStatus })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const btn = document.getElementById('loginToggleAppBtn');
+            if (btn) {
+                btn.textContent = newStatus ? 'Login: ON' : 'Login: OFF';
+                btn.style.background = newStatus ? '#f59e0b' : '#64748b';
+            }
+            alert(newStatus ? 'Login ON - users must login now' : 'Login OFF - app opens directly');
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// Update login toggle button status on load
+async function updateLoginToggleButton() {
+    try {
+        const res = await fetch(`${Auth.getProxyBase()}/api/auth/check-login-required`);
+        const data = await res.json();
+        const btn = document.getElementById('loginToggleAppBtn');
+        if (btn) {
+            const isOn = data.loginRequired !== false;
+            btn.textContent = isOn ? 'Login: ON' : 'Login: OFF';
+            btn.style.background = isOn ? '#f59e0b' : '#64748b';
+        }
+    } catch (e) {}
+}
+setTimeout(updateLoginToggleButton, 1000);
