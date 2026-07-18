@@ -55,6 +55,18 @@
 <div id="adminDashboard" class="container hidden">
     <h1>Admin Panel — Options Signal Scanner</h1>
 
+    <!-- LOGIN TOGGLE -->
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+            <h2 style="margin-bottom:4px">Login Requirement</h2>
+            <p style="color:#6b7b8f;font-size:13px">OFF = app opens directly without login. ON = users must login.</p>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+            <span id="loginStatusText" style="font-weight:700;font-size:14px">--</span>
+            <button class="btn btn-primary" id="loginToggleBtn" onclick="toggleLoginRequirement()">Toggle</button>
+        </div>
+    </div>
+
     <!-- STATS -->
     <div class="grid" id="statsGrid"></div>
 
@@ -124,6 +136,24 @@ async function loadDashboard() {
     document.getElementById('adminDashboard').classList.remove('hidden');
     renderUsers(result.users);
     loadSessions();
+    loadLoginStatus();
+}
+
+async function loadLoginStatus() {
+    const result = await apiCall('/api/admin/settings');
+    if (result.success) {
+        const enabled = result.loginRequired !== false;
+        document.getElementById('loginStatusText').textContent = enabled ? 'ON (Login Required)' : 'OFF (Direct Access)';
+        document.getElementById('loginStatusText').style.color = enabled ? '#68d391' : '#fc8181';
+    }
+}
+
+async function toggleLoginRequirement() {
+    const result = await apiCall('/api/admin/settings');
+    const currentStatus = result.loginRequired !== false;
+    const newStatus = !currentStatus;
+    await apiCall('/api/admin/toggle-login', { enabled: newStatus });
+    loadLoginStatus();
 }
 
 function renderUsers(users) {

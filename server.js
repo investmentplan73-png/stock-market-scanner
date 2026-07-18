@@ -124,6 +124,12 @@ async function handleApi(req, res) {
         return;
     }
 
+    if (req.method === 'GET' && req.url === '/api/auth/check-login-required') {
+        const loginRequired = getAppSetting('loginRequired', true);
+        sendJson(res, 200, { loginRequired });
+        return;
+    }
+
     // Auth routes (allow before POST check for flexibility)
     if (req.method === 'POST' && req.url === '/api/auth/signup') {
         const body = await readJson(req);
@@ -2118,5 +2124,42 @@ async function handleAdminRoute(url, body) {
         return { success: true, sessions: active, total: active.length };
     }
 
+    if (url === '/api/admin/toggle-login') {
+        const enabled = body.enabled !== undefined ? Boolean(body.enabled) : true;
+        saveAppSetting('loginRequired', enabled);
+        return { success: true, message: `Login requirement ${enabled ? 'ON' : 'OFF'}`, loginRequired: enabled };
+    }
+
+    if (url === '/api/admin/settings') {
+        return { success: true, loginRequired: getAppSetting('loginRequired', true) };
+    }
+
     return { success: false, message: 'Unknown admin route' };
+}
+
+const APP_SETTINGS_FILE = path.join(ROOT, '.cache', 'app-settings.json');
+
+function loadAppSettings() {
+    try {
+        return JSON.parse(fs.readFileSync(APP_SETTINGS_FILE, 'utf8'));
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveAppSettings(settings) {
+    const dir = path.dirname(APP_SETTINGS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(APP_SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+function getAppSetting(key, defaultValue) {
+    const settings = loadAppSettings();
+    return settings[key] !== undefined ? settings[key] : defaultValue;
+}
+
+function saveAppSetting(key, value) {
+    const settings = loadAppSettings();
+    settings[key] = value;
+    saveAppSettings(settings);
 }

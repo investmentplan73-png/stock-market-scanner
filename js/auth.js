@@ -4,7 +4,21 @@ const Auth = {
     currentUser: null,
     sessionKey: 'authSession',
 
-    init: function() {
+    init: async function() {
+        // Check if login is required (admin can disable it)
+        try {
+            const res = await fetch(`${this.getProxyBase()}/api/auth/check-login-required`);
+            const data = await res.json();
+            if (data.loginRequired === false) {
+                // Login disabled by admin - go directly to app
+                this.currentUser = { name: 'Guest', email: '' };
+                this.showApp();
+                return;
+            }
+        } catch (e) {
+            // If server not reachable, show login anyway
+        }
+
         const session = this.getSession();
         if (session && session.token && session.user) {
             this.currentUser = session.user;
