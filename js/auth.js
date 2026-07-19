@@ -261,3 +261,80 @@ async function updateLoginToggleButton() {
     } catch (e) {}
 }
 setTimeout(updateLoginToggleButton, 1000);
+
+// ==================== CHANGE PASSWORD ====================
+
+function showChangePasswordModal() {
+    document.getElementById('changePasswordModal').classList.remove('hidden');
+    document.getElementById('oldPassword').value = '';
+    document.getElementById('newPassword1').value = '';
+    document.getElementById('newPassword2').value = '';
+    document.getElementById('changePassError').textContent = '';
+    document.getElementById('changePassSuccess').textContent = '';
+    document.getElementById('changePassSuccess').classList.add('hidden');
+}
+
+function closeChangePasswordModal() {
+    document.getElementById('changePasswordModal').classList.add('hidden');
+}
+
+async function submitChangePassword() {
+    const oldPass = document.getElementById('oldPassword').value;
+    const newPass = document.getElementById('newPassword1').value;
+    const confirmPass = document.getElementById('newPassword2').value;
+    const errorEl = document.getElementById('changePassError');
+    const successEl = document.getElementById('changePassSuccess');
+
+    errorEl.textContent = '';
+    successEl.textContent = '';
+    successEl.classList.add('hidden');
+
+    if (!oldPass || !newPass || !confirmPass) {
+        errorEl.textContent = 'All fields are required';
+        return;
+    }
+
+    if (newPass.length < 6) {
+        errorEl.textContent = 'New password must be at least 6 characters';
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        errorEl.textContent = 'New passwords do not match';
+        return;
+    }
+
+    if (oldPass === newPass) {
+        errorEl.textContent = 'New password must be different from old password';
+        return;
+    }
+
+    try {
+        const session = Auth.getSession();
+        const response = await fetch(`${Auth.getProxyBase()}/api/auth/change-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: session?.user?.id || '',
+                oldPassword: oldPass,
+                newPassword: newPass
+            })
+        });
+        const data = await response.json();
+
+        if (!data.success) {
+            errorEl.textContent = data.message || 'Failed to change password';
+            return;
+        }
+
+        successEl.textContent = '✓ Password changed successfully!';
+        successEl.classList.remove('hidden');
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword1').value = '';
+        document.getElementById('newPassword2').value = '';
+
+        setTimeout(() => closeChangePasswordModal(), 2000);
+    } catch (error) {
+        errorEl.textContent = 'Server error. Try again.';
+    }
+}

@@ -180,6 +180,13 @@ async function handleApi(req, res) {
         return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/auth/change-password') {
+        const body = await readJson(req);
+        const result = await handleChangePassword(body);
+        sendJson(res, result.success ? 200 : 400, result);
+        return;
+    }
+
     // Admin routes
     if (req.method === 'POST' && req.url.startsWith('/api/admin/')) {
         const body = await readJson(req);
@@ -2190,6 +2197,37 @@ function removeSessionsByUser(userId) {
 async function handleAuthSignup(body) {
     // Public signup disabled - only admin can create accounts
     return { success: false, message: 'Signup is disabled. Contact admin on WhatsApp for login access.' };
+}
+
+async function handleChangePassword(body) {
+    const userId = String(body.userId || '').trim();
+    const oldPassword = String(body.oldPassword || '');
+    const newPassword = String(body.newPassword || '');
+
+    if (!userId || !oldPassword || !newPassword) {
+        return { success: false, message: 'All fields are required' };
+    }
+
+    if (newPassword.length < 6) {
+        return { success: false, message: 'New password must be at least 6 characters' };
+    }
+
+    const users = loadUsers();
+    const user = users.find(u => u.id === userId);
+
+    if (!user) {
+        return { success: false, message: 'User not found' };
+    }
+
+    if (user.passwordHash !== hashPassword(oldPassword)) {
+        return { success: false, message: 'Old password is incorrect' };
+    }
+
+    user.passwordHash = hashPassword(newPassword);
+    saveUsers(users);
+    console.log(`Password changed for user: ${user.email}`);
+
+    return { success: true, message: 'Password changed successfully' };
 }
 
 async function handleAuthLogin(body) {
