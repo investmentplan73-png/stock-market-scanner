@@ -1892,10 +1892,129 @@ function readInt64LeSafe(buffer, offset) {
 // ==================== USER AUTHENTICATION ====================
 
 const SESSIONS_FILE = path.join(ROOT, '.cache', 'sessions.json');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro'; // Set in Render env vars
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro';
 
-// In-memory users cache - survives file deletion during same process
+// JSONBin.io configuration for persistent user storage
+const JSONBIN_KEY = process.env.JSONBIN_KEY || '$2a$10$f2FFAfmEDYlWJF1iukJkiukRR/wSDCMxJ2mbeyJkRKRkP37Wp/GQK';
+const JSONBIN_ID = process.env.JSONBIN_ID || '6a5c269ff5f4af5e29a277c6';
+const JSONBIN_API = 'https://api.jsonbin.io/v3';
+
+// In-memory users cache
 let usersMemoryCache = null;
+let jsonbinSyncInProgress = false;
+
+// ---- JSONBin Functions ----
+
+async function jsonbinRead() {
+    try {
+        const response = await fetch(`${JSONBIN_API}/b/${JSONBIN_ID}/latest`, {
+            headers: { 'X-Master-Key': JSONBIN_KEY }
+        });
+        if (!response.ok) {
+            console.log(`JSONBin read failed: HTTP ${response.status}`);
+            return null;
+        }
+        const result = await response.json();
+        return result.record || null;
+    } catch (error) {
+        console.log(`JSONBin read error: ${error.message}`);
+        return null;
+    }
+}
+
+async function jsonbinWrite(data) {
+    if (jsonbinSyncInProgress) return false;
+    jsonbinSyncInProgress = true;
+    try {
+        const response = await fetch(`${JSONBIN_API}/b/${JSONBIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Master-Key': JSONBIN_KEY
+            },
+            body: JSON.stringify(data)
+        });
+        if (!response.ok) {
+            console.log(`JSONBin write failed: HTTP ${response.status}`);
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.log(`JSONBin write error: ${error.message}`);
+        return false;
+    } finally {
+        jsonbinSyncInProgress = false;
+    }
+}
+
+async function syncUsersToJsonBin(users) {
+    const data = await jsonbinRead();
+    const record = data || { users: [], loginRequired: true };
+    record.users = users;
+    await jsonbinWrite(record);
+}
+
+async function loadUsersFromJsonBin() {
+    const data = await jsonbinRead();
+    if (data && Array.isArray(data.users) && data.users.length) {
+        console.log(`Loaded ${data.users.length} user(s) from JSONBin.`);
+        return data.users;
+    }
+    return null;
+}
+
+// ---- User Load/Save with JSONBin ----
+
+function loadUsers() {
+    if (usersMemoryCache && usersMemoryCache.length) {
+        return usersMemoryCache;
+    }
+
+    // Try local file first (fast)
+    try {
+        const data = fs.readFileSync(USERS_FILE, 'utf8');
+        const users = JSON.parse(data);
+        if (Array.isArray(users) && users.length) {
+            usersMemoryCache = users;
+            return users;
+        }
+    } catch (error) {}
+
+    // Seed from env var
+    const seedUsers = seedUsersFromEnv();
+    if (seedUsers.length) {
+        usersMemoryCache = seedUsers;
+        saveUsers(seedUsers);
+        return seedUsers;
+    }
+    return [];
+}
+
+// Async load from JSONBin on startup
+async function initUsersFromJsonBin() {
+    const jsonbinUsers = await loadUsersFromJsonBin();
+    if (jsonbinUsers && jsonbinUsers.length) {
+        usersMemoryCache = jsonbinUsers;
+        // Also save to local file for fast reads
+        const dir = path.dirname(USERS_FILE);
+        try {
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            fs.writeFileSync(USERS_FILE, JSON.stringify(jsonbinUsers, null, 2));
+        } catch (e) {}
+        console.log(`Users synced from JSONBin: ${jsonbinUsers.length} user(s)`);
+        return;
+    }
+
+    // If JSONBin empty, push local/seed users to it
+    const localUsers = loadUsers();
+    if (localUsers.length) {
+        await syncUsersToJsonBin(localUsers);
+        console.log(`Pushed ${localUsers.length} local user(s) to JSONBin.`);
+    }
+}
+
+// Start JSONBin sync on server boot
+initUsersFromJsonBin().catch(err => console.log('JSONBin init warning:', err.message));
 
 function loadUsers() {
     // If we have in-memory cache, use that (survives file issues)
@@ -1960,6 +2079,7 @@ function saveUsers(users) {
     // Always update memory cache first
     usersMemoryCache = users;
 
+    // Save to local file
     const dir = path.dirname(USERS_FILE);
     try {
         if (!fs.existsSync(dir)) {
@@ -1969,6 +2089,11 @@ function saveUsers(users) {
     } catch (e) {
         console.log('Warning: Could not write users file, using memory cache.');
     }
+
+    // Sync to JSONBin (async, non-blocking)
+    syncUsersToJsonBin(users).catch(err =>
+        console.log('JSONBin sync warning:', err.message)
+    );
 }
 
 function loadSessions() {
@@ -2248,7 +2373,6 @@ function loadAppSettings() {
     try {
         return JSON.parse(fs.readFileSync(APP_SETTINGS_FILE, 'utf8'));
     } catch (e) {
-        // Default: check LOGIN_REQUIRED env var
         const loginRequired = process.env.LOGIN_REQUIRED !== 'false';
         return { loginRequired };
     }
@@ -2258,6 +2382,14 @@ function saveAppSettings(settings) {
     const dir = path.dirname(APP_SETTINGS_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(APP_SETTINGS_FILE, JSON.stringify(settings, null, 2));
+
+    // Also save loginRequired to JSONBin
+    jsonbinRead().then(data => {
+        if (data) {
+            data.loginRequired = settings.loginRequired;
+            jsonbinWrite(data);
+        }
+    }).catch(() => {});
 }
 
 function getAppSetting(key, defaultValue) {
