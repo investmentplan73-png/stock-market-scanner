@@ -1928,8 +1928,8 @@ const SESSIONS_FILE = path.join(ROOT, '.cache', 'sessions.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin@2024#pro';
 
 // JSONBin.io configuration for persistent user storage
-const JSONBIN_KEY = process.env.JSONBIN_KEY || '$2a$10$f2FFAfmEDYlWJF1iukJkiukRR/wSDCMxJ2mbeyJkRKRkP37Wp/GQK';
-const JSONBIN_ID = process.env.JSONBIN_ID || '6a5c269ff5f4af5e29a277c6';
+const JSONBIN_KEY = process.env.JSONBIN_KEY || '';
+const JSONBIN_ID = process.env.JSONBIN_ID || '';
 const JSONBIN_API = 'https://api.jsonbin.io/v3';
 
 // In-memory users cache
