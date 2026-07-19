@@ -1939,6 +1939,7 @@ let jsonbinSyncInProgress = false;
 // ---- JSONBin Functions ----
 
 async function jsonbinRead() {
+    if (!JSONBIN_KEY || !JSONBIN_ID) return null;
     try {
         const response = await fetch(`${JSONBIN_API}/b/${JSONBIN_ID}/latest`, {
             headers: { 'X-Master-Key': JSONBIN_KEY }
@@ -1956,6 +1957,7 @@ async function jsonbinRead() {
 }
 
 async function jsonbinWrite(data) {
+    if (!JSONBIN_KEY || !JSONBIN_ID) return false;
     if (jsonbinSyncInProgress) return false;
     jsonbinSyncInProgress = true;
     try {
