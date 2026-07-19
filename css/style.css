@@ -576,12 +576,23 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .history-card-sub { font-size: 11px; color: #6b7b8f; margin-top: 3px; }
 
 /* ==================== OPTION SUMMARY ==================== */
-.option-summary { background: linear-gradient(145deg, rgba(17, 24, 39, 0.8), rgba(13, 18, 33, 0.8)); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; font-size: 13px; color: #e8eaf6; border-left: 4px solid #63b3ed; border: 1px solid rgba(99, 179, 237, 0.08); border-left: 4px solid #63b3ed; }
-.summary-title { font-weight: 800; margin-bottom: 6px; font-size: 14px; background: linear-gradient(135deg, #63b3ed, #4fd1c5); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.summary-grid { display: flex; gap: 4px 16px; flex-wrap: wrap; align-items: baseline; }
-.summary-metric { font-size: 12px; color: #6b7b8f; white-space: nowrap; }
-.summary-metric strong { font-size: 13px; color: #fff; margin-left: 3px; font-weight: 700; }
-.summary-reasons { font-size: 11px; color: #5a6a7a; margin-top: 4px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.option-summary { background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(13, 18, 33, 0.95)); border-radius: 16px; padding: 20px; margin-bottom: 12px; font-size: 13px; color: #e8eaf6; border: 1px solid rgba(99, 179, 237, 0.12); position: relative; overflow: hidden; }
+.option-summary::before { content: ''; position: absolute; top: 0; left: 0; width: 5px; height: 100%; background: linear-gradient(180deg, #63b3ed, #4fd1c5); border-radius: 4px 0 0 4px; }
+.summary-title { font-weight: 900; margin-bottom: 14px; font-size: 17px; letter-spacing: 0.5px; padding: 8px 14px; border-radius: 10px; display: inline-block; }
+.summary-title-buy { background: rgba(74, 222, 128, 0.12); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.2); }
+.summary-title-watch { background: rgba(251, 191, 36, 0.12); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.2); }
+.summary-title-notrade { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.15); }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.summary-metric { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(99, 179, 237, 0.06); border-radius: 10px; padding: 10px 12px; text-align: center; }
+.summary-metric span { display: block; font-size: 10px; color: #6b7b8f; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; margin-bottom: 4px; }
+.summary-metric strong { display: block; font-size: 15px; color: #fff; font-weight: 800; }
+.summary-metric.metric-entry strong { color: #63b3ed; }
+.summary-metric.metric-sl strong { color: #f87171; }
+.summary-metric.metric-target strong { color: #4ade80; }
+.summary-metric.metric-score strong { color: #fbbf24; }
+.summary-reasons { font-size: 11px; color: #6b7b8f; line-height: 1.6; padding: 10px 12px; background: rgba(15, 23, 42, 0.4); border-radius: 8px; border: 1px solid rgba(99, 179, 237, 0.04); }
+.summary-reasons .reason-good { color: #4ade80; }
+.summary-reasons .reason-warn { color: #fbbf24; }
 
 /* ==================== SIGNALS ==================== */
 .signal-card { background: linear-gradient(145deg, rgba(17, 24, 39, 0.8), rgba(13, 18, 33, 0.8)); border-left: 4px solid #63b3ed; border-radius: 0 14px 14px 0; padding: 18px 22px; margin-bottom: 12px; border-top: 1px solid rgba(99, 179, 237, 0.06); border-right: 1px solid rgba(99, 179, 237, 0.06); border-bottom: 1px solid rgba(99, 179, 237, 0.06); }

@@ -2583,36 +2583,44 @@ function renderOptionSummary(evaluation) {
     const orbGapBb = indicatorContext.ORBGapBBContext || {};
     if (!best) {
         const biasLine = `${evaluation.bias?.direction || 'NEUTRAL'} ${evaluation.bias?.strength || 0}%`;
-        const ictLine = `FVG:${formatIctValue(ict.fvg)} Liq:${formatIctValue(ict.liquidity)} Disp:${formatIctValue(ict.displacement)}`;
-        const orbLine = `ORB:${formatOrbGapSummary(orbGapBb)} Trap:${formatOrbValue(orbGapBb.bbTrap?.type)}`;
         summary.innerHTML = `
-            <div class="summary-title">NO TRADE - Not aligned</div>
+            <div class="summary-title summary-title-notrade">⏸ NO TRADE - Setup Not Aligned</div>
             <div class="summary-grid">
-                <div class="summary-metric">Spot<strong>${OptionSignalEngine.formatMoney(evaluation.spotPrice)}</strong></div>
-                <div class="summary-metric">ATM<strong>${evaluation.atmStrike}</strong></div>
-                <div class="summary-metric">Bias<strong>${biasLine}</strong></div>
-                <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+                <div class="summary-metric"><span>Spot Price</span><strong>${OptionSignalEngine.formatMoney(evaluation.spotPrice)}</strong></div>
+                <div class="summary-metric"><span>ATM Strike</span><strong>${evaluation.atmStrike}</strong></div>
+                <div class="summary-metric"><span>Market Bias</span><strong>${biasLine}</strong></div>
+                <div class="summary-metric"><span>ICT/SMC</span><strong>${formatIctValue(advancedIct.direction || 'NEUTRAL')}</strong></div>
             </div>
-            <div class="summary-reasons" style="font-size:12px;line-height:1.4">${ictLine} | ${orbLine}</div>
+            <div class="summary-reasons">Waiting for proper setup alignment...</div>
         `;
         return;
     }
 
+    const isBuy = best.action.includes('BUY');
+    const titleClass = isBuy ? 'summary-title-buy' : 'summary-title-watch';
+    const titleIcon = isBuy ? '🟢' : '🟡';
+    const sideEmoji = best.side === 'CALL' ? '📈' : '📉';
+
+    // Format reasons nicely
+    const goodReasons = best.reasons.map(r => `<span class="reason-good">✓ ${r}</span>`).join('<br>');
+    const warnReasons = best.warnings.map(w => `<span class="reason-warn">⚠ ${w}</span>`).join('<br>');
+    const allReasons = [goodReasons, warnReasons].filter(Boolean).join('<br>');
+
     summary.innerHTML = `
-        <div class="summary-title">${best.action}: ${best.symbol} ${best.strike} ${best.side}</div>
+        <div class="summary-title ${titleClass}">${titleIcon} ${best.action}: ${best.symbol} ${best.strike} ${best.side} ${sideEmoji}</div>
         <div class="summary-grid">
-            <div class="summary-metric">Score<strong>${best.score}%</strong></div>
-            <div class="summary-metric">Entry<strong>${OptionSignalEngine.formatMoney(best.risk.entry)}</strong></div>
-            <div class="summary-metric">SL<strong>${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
-            <div class="summary-metric">T1<strong>${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
-            <div class="summary-metric">T2<strong>${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
-            <div class="summary-metric">T3<strong>${OptionSignalEngine.formatMoney(best.risk.target3 || 0)}</strong></div>
-            <div class="summary-metric">R:R<strong>${best.risk.riskReward || '--'}</strong></div>
-            <div class="summary-metric">Lot<strong>${formatOptionLotSize(best)}</strong></div>
-            <div class="summary-metric">Bias<strong>${best.bias.direction}</strong></div>
-            <div class="summary-metric">ICT<strong>${formatAdvancedIctSummary(advancedIct)}</strong></div>
+            <div class="summary-metric metric-score"><span>Score</span><strong>${best.score}%</strong></div>
+            <div class="summary-metric metric-entry"><span>Entry</span><strong>₹${OptionSignalEngine.formatMoney(best.risk.entry)}</strong></div>
+            <div class="summary-metric metric-sl"><span>Stop Loss</span><strong>₹${OptionSignalEngine.formatMoney(best.risk.stopLoss)}</strong></div>
+            <div class="summary-metric metric-target"><span>Target 1</span><strong>₹${OptionSignalEngine.formatMoney(best.risk.target1)}</strong></div>
+            <div class="summary-metric metric-target"><span>Target 2</span><strong>₹${OptionSignalEngine.formatMoney(best.risk.target2)}</strong></div>
+            <div class="summary-metric metric-target"><span>Target 3</span><strong>₹${OptionSignalEngine.formatMoney(best.risk.target3 || 0)}</strong></div>
+            <div class="summary-metric"><span>Risk:Reward</span><strong>${best.risk.riskReward || '--'}</strong></div>
+            <div class="summary-metric"><span>Lot Size</span><strong>${formatOptionLotSize(best)}</strong></div>
+            <div class="summary-metric"><span>Bias</span><strong>${best.bias.direction}</strong></div>
+            <div class="summary-metric"><span>ICT/SMC</span><strong>${formatIctValue(advancedIct.direction || 'NEUTRAL')}</strong></div>
         </div>
-        <div class="summary-reasons">${[...best.reasons, ...best.warnings.map(item => `Caution: ${item}`)].join(' | ')}</div>
+        <div class="summary-reasons">${allReasons}</div>
     `;
 }
 
