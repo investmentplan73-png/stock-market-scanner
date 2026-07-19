@@ -94,6 +94,7 @@ server.on('upgrade', (req, socket) => {
 
 server.listen(currentPort, HOST, () => {
     printServerUrls(currentPort);
+    startKeepAlive();
 });
 
 function printServerUrls(port) {
@@ -105,6 +106,38 @@ function printServerUrls(port) {
         lanUrls.forEach(url => console.log(`  ${url}`));
         console.log('Use a phone on the same Wi-Fi network and keep this server window open.');
     }
+}
+
+// ==================== KEEP ALIVE (Prevent Render Sleep) ====================
+function startKeepAlive() {
+    // Only activate on deployed server (not localhost)
+    const appUrl = process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || '';
+    if (!appUrl) {
+        console.log('Keep-Alive: Skipped (localhost mode)');
+        return;
+    }
+
+    const pingUrl = `${appUrl}/api/health`;
+    const INTERVAL = 10 * 60 * 1000; // 10 minutes
+
+    console.log(`Keep-Alive: Active - pinging ${pingUrl} every 10 minutes`);
+
+    setInterval(async () => {
+        try {
+            const response = await fetch(pingUrl, { signal: AbortSignal.timeout(10000) });
+            const data = await response.json().catch(() => ({}));
+            console.log(`Keep-Alive ping: ${data.status ? 'OK' : 'responded'} @ ${new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })}`);
+        } catch (error) {
+            console.log(`Keep-Alive ping failed: ${error.message}`);
+        }
+    }, INTERVAL);
+
+    // First ping after 30 seconds
+    setTimeout(async () => {
+        try {
+            await fetch(pingUrl, { signal: AbortSignal.timeout(10000) });
+        } catch (e) {}
+    }, 30000);
 }
 
 function getLanUrls(port) {

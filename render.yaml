@@ -9,6 +9,8 @@ services:
         value: production
       - key: ADMIN_PASSWORD
         sync: false
+      - key: RENDER_EXTERNAL_URL
+        value: https://stock-market-scanner.onrender.com
     disk:
       name: data
       mountPath: /opt/render/project/src/.cache
