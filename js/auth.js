@@ -56,7 +56,20 @@ const Auth = {
         document.getElementById('appContainer').classList.remove('hidden');
         const userEl = document.getElementById('loggedInUser');
         if (userEl && this.currentUser) {
-            userEl.textContent = this.currentUser.name || this.currentUser.email || '';
+            const name = this.currentUser.name || this.currentUser.email || '';
+            let expiryText = '';
+            if (this.currentUser.expiryDate) {
+                const expDate = new Date(this.currentUser.expiryDate);
+                const now = new Date();
+                const daysLeft = Math.ceil((expDate - now) / (1000 * 60 * 60 * 24));
+                const dateStr = expDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+                if (daysLeft <= 7) {
+                    expiryText = ` | Expires: ${dateStr} (${daysLeft}d left ⚠️)`;
+                } else {
+                    expiryText = ` | Expires: ${dateStr}`;
+                }
+            }
+            userEl.innerHTML = `${name}<span style="font-size:10px;color:#6b7b8f;margin-left:6px">${expiryText}</span>`;
         }
     },
 

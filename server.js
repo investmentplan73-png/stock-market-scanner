@@ -2244,7 +2244,7 @@ async function handleAuthLogin(body) {
     return {
         success: true,
         message: 'Login successful',
-        user: { id: user.id, name: user.name, email: user.email, mobile: user.mobile },
+        user: { id: user.id, name: user.name, email: user.email, mobile: user.mobile, expiryDate: user.expiryDate || null },
         token
     };
 }
