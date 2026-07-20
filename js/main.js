@@ -813,22 +813,40 @@ function updateMarketBreadth() {
         }
     });
 
-    // For stocks, count from active option signals/scanner results if available
+    // For stocks: count from scan results (signal cards in auto scanner)
     const scanResults = document.querySelectorAll('#marketScanResults .signal-card');
     scanResults.forEach(card => {
         const text = card.textContent || '';
-        if (/BUY|CALL/i.test(text)) stockUp++;
-        else if (/SELL|PUT/i.test(text)) stockDown++;
+        if (/BUY\s*(CALL)?|BTST\s*(CALL)?|SWING\s*(CALL)?/i.test(text)) stockUp++;
+        else if (/BUY\s*PUT|BTST\s*PUT|SWING\s*PUT/i.test(text)) stockDown++;
     });
 
-    // If no scan results, estimate from auto-scanner state
-    if (!stockUp && !stockDown && autoScanState.resolvedStocks.length) {
+    // Also count from resolved stocks that have live price data
+    if (autoScanState.resolvedStocks && autoScanState.resolvedStocks.length) {
+        let resolvedUp = 0;
+        let resolvedDown = 0;
         autoScanState.resolvedStocks.forEach(stock => {
             const change = latestChangeBySymbol[stock.symbol];
             if (change) {
-                if (Number(change.points || 0) > 0) stockUp++;
-                else if (Number(change.points || 0) < 0) stockDown++;
+                if (Number(change.points || 0) > 0) resolvedUp++;
+                else if (Number(change.points || 0) < 0) resolvedDown++;
             }
+        });
+        // Use resolved stocks if we have data and no scan signal cards
+        if ((resolvedUp || resolvedDown) && !stockUp && !stockDown) {
+            stockUp = resolvedUp;
+            stockDown = resolvedDown;
+        }
+    }
+
+    // Fallback: count from active trades
+    if (!stockUp && !stockDown) {
+        const history = getOptionTradeHistory ? getOptionTradeHistory() : [];
+        history.forEach(trade => {
+            if (trade.status !== 'open') return;
+            const pnl = Number(trade.pnl || 0);
+            if (pnl > 0) stockUp++;
+            else if (pnl < 0) stockDown++;
         });
     }
 
