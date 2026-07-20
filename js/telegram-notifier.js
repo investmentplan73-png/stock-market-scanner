@@ -200,8 +200,11 @@ const TelegramNotifier = {
             this.logSkip(signal, `${signal.action || 'Signal'} is shown in the app but Telegram sends only BUY/BTST alerts.`);
             return false;
         }
-        if (!options.bypassScore && Number(signal.score || 0) < Number(Config.telegram.minAlertScore || 70)) {
-            this.logSkip(signal, `Score ${signal.score}% is below Telegram min score ${Config.telegram.minAlertScore || 70}%.`);
+        // Only apply score filter for non-BUY signals
+        const minScore = Number(Config.telegram.minAlertScore || 70);
+        const isBuyAction = String(signal.action || '').startsWith('BUY') || String(signal.action || '').startsWith('BTST');
+        if (!options.bypassScore && !isBuyAction && Number(signal.score || 0) < minScore) {
+            this.logSkip(signal, `Score ${signal.score}% is below Telegram min score ${minScore}%.`);
             return false;
         }
 

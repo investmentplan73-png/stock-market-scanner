@@ -2933,6 +2933,8 @@ function getOptionTradeKey(signal) {
 
 function registerOptionTrade(signal, options = {}) {
     if (!isTradeAlertAction(signal?.action)) return;
+    // Only track calls with 100% confidence score in P&L
+    if (Number(signal.score || 0) < 100) return;
 
     const risk = signal.risk || {};
     const now = new Date().toISOString();
