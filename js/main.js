@@ -566,7 +566,9 @@ function getOpenOptionExchangeTokens(baseTokens = {}) {
         return result;
     }, {});
 
-    getActiveOptionSignals().forEach(signal => {
+    // Add only first 20 active signal tokens to avoid exceeding Angel One limit
+    const activeSignals = getActiveOptionSignals().slice(0, 20);
+    activeSignals.forEach(signal => {
         addExchangeToken(grouped, signal.option?.exchange || signal.exchange, signal.option?.token);
     });
 
