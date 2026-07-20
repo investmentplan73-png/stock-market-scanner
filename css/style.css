@@ -595,14 +595,17 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .summary-reasons .reason-warn { color: #fbbf24; }
 
 /* ==================== SIGNALS ==================== */
-.signal-card { background: linear-gradient(145deg, rgba(17, 24, 39, 0.8), rgba(13, 18, 33, 0.8)); border-left: 4px solid #63b3ed; border-radius: 0 14px 14px 0; padding: 18px 22px; margin-bottom: 12px; border-top: 1px solid rgba(99, 179, 237, 0.06); border-right: 1px solid rgba(99, 179, 237, 0.06); border-bottom: 1px solid rgba(99, 179, 237, 0.06); }
+.signals-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.signal-card { background: linear-gradient(145deg, rgba(17, 24, 39, 0.8), rgba(13, 18, 33, 0.8)); border-left: 4px solid #63b3ed; border-radius: 0 10px 10px 0; padding: 12px 14px; border-top: 1px solid rgba(99, 179, 237, 0.06); border-right: 1px solid rgba(99, 179, 237, 0.06); border-bottom: 1px solid rgba(99, 179, 237, 0.06); }
 .signal-card.buy { border-left-color: #68d391; }
 .signal-card.sell { border-left-color: #fc8181; }
 .signal-card.btst { border-left-color: #fbbf24; }
 .signal-card.swing { border-left-color: #f59e0b; background: linear-gradient(145deg, rgba(17, 24, 39, 0.9), rgba(25, 20, 10, 0.8)); }
-.signal-card h4 { font-size: 15px; color: #fff; margin-bottom: 8px; font-weight: 700; }
-.signal-details { font-size: 13px; color: #8899aa; line-height: 1.7; }
-.signal-card-actions { margin-top: 10px; display: flex; gap: 8px; }
+.signal-card h4 { font-size: 13px; color: #fff; margin-bottom: 4px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.signal-details { font-size: 11px; color: #8899aa; line-height: 1.5; }
+.signal-card-actions { margin-top: 6px; display: flex; gap: 6px; align-items: center; }
+.signal-card-actions .btn { padding: 4px 10px; font-size: 11px; }
+.signal-send-status { font-size: 10px; color: #fc8181; }
 
 /* Option Chain Signal Tags */
 .signal { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }

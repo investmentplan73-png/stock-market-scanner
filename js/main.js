@@ -4881,16 +4881,8 @@ function createOptionSignalCard(signal) {
     card.innerHTML = `
         <h4>${escapeHtml(signal.action)} ${escapeHtml(signal.symbol)} ${escapeHtml(signal.strike)} ${escapeHtml(signal.side)}</h4>
         <div class="signal-details">
-            <strong>Source:</strong> ${escapeHtml(signal.source || 'Auto scan')}<br>
-            <strong>Expiry:</strong> ${escapeHtml(signal.expiryDate || '--')}<br>
-            <strong>Score:</strong> ${Number(signal.score || 0)}% |
-            <strong>LTP:</strong> <span data-live-signal-ltp>${OptionSignalEngine.formatMoney(getLiveOptionLtp(signal.option))}</span><br>
-            <strong>SL:</strong> ${OptionSignalEngine.formatMoney(risk.stopLoss)}
-            ${risk.optionSupport ? `<strong>Option Support:</strong> ${OptionSignalEngine.formatMoney(risk.optionSupport)}` : ''}
-            <strong>Lot Size:</strong> ${escapeHtml(formatOptionLotSize(signal))}
-            <strong>T1:</strong> ${OptionSignalEngine.formatMoney(risk.target1)}
-            <strong>T2:</strong> ${OptionSignalEngine.formatMoney(risk.target2)}
-            ${!isTrade && blockers.length ? `<br><strong>Buy abhi confirm nahi:</strong> ${escapeHtml(blockers.join(' | '))}` : ''}
+            ${escapeHtml(signal.expiryDate || '--')} | Score: ${Number(signal.score || 0)}% | LTP: <span data-live-signal-ltp>${OptionSignalEngine.formatMoney(getLiveOptionLtp(signal.option))}</span><br>
+            SL: ${OptionSignalEngine.formatMoney(risk.stopLoss)} | T1: ${OptionSignalEngine.formatMoney(risk.target1)} | T2: ${OptionSignalEngine.formatMoney(risk.target2)} | Lot: ${escapeHtml(formatOptionLotSize(signal))}${!isTrade && blockers.length ? `<br><span style="color:#fbbf24;font-size:10px">${escapeHtml(blockers.join(' | '))}</span>` : ''}
         </div>
     `;
 
