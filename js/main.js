@@ -4931,7 +4931,14 @@ function createOptionSignalCard(signal) {
 
         sendButton.disabled = false;
         sendButton.textContent = 'Send Telegram';
-        sendStatus.textContent = TelegramNotifier.lastSendError || 'Check Telegram settings';
+        const errorMsg = TelegramNotifier.lastSendError || '';
+        if (!Config.telegram.enabled) {
+            sendStatus.textContent = '❌ Telegram disabled. Enable in Telegram Alerts section.';
+        } else if (!Config.telegram.botToken || !Config.telegram.chatId) {
+            sendStatus.textContent = '❌ Bot Token or Chat ID missing. Set in Telegram Alerts section.';
+        } else {
+            sendStatus.textContent = '❌ ' + (errorMsg || 'Send failed. Check Telegram Alerts section.');
+        }
     });
 
     actions.appendChild(sendButton);
