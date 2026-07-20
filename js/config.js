@@ -286,7 +286,7 @@ const Config = {
         useAllFnoStocks: true,
         includeCommodities: true,
         marketMoodFilter: {
-            enabled: true,
+            enabled: false,
             minScoreAgainstMood: 90
         },
         stockSymbols: [

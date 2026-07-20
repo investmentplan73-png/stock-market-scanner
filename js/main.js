@@ -3936,10 +3936,10 @@ async function runBtstBackgroundScan(targets) {
                 } catch (e) { /* skip this timeframe */ }
             }
 
-            // Need both 1hr AND Daily to agree
+            // Need both 1hr AND Daily to agree with strong synergy
             if (tfResults.length < 2) continue;
-            const bullish = tfResults.filter(r => r.direction === 'BULLISH');
-            const bearish = tfResults.filter(r => r.direction === 'BEARISH');
+            const bullish = tfResults.filter(r => r.direction === 'BULLISH' && r.synergyScore >= 60);
+            const bearish = tfResults.filter(r => r.direction === 'BEARISH' && r.synergyScore >= 60);
             if (bullish.length < 2 && bearish.length < 2) continue;
 
             const direction = bullish.length >= 2 ? 'BULLISH' : 'BEARISH';
@@ -3973,16 +3973,6 @@ async function runBtstBackgroundScan(targets) {
 
             // Find best option in the confirmed direction
             const wantedSide = direction === 'BULLISH' ? 'CALL' : 'PUT';
-
-            // MARKET MOOD CHECK: Don't trade against overall market direction
-            if (typeof getMarketMood === 'function') {
-                const mood = getMarketMood();
-                if (mood) {
-                    const moodDirection = mood.direction || '';
-                    if (moodDirection === 'BULLISH' && wantedSide === 'PUT') continue;
-                    if (moodDirection === 'BEARISH' && wantedSide === 'CALL') continue;
-                }
-            }
 
             const candidates = evaluation.rows
                 .map(row => wantedSide === 'CALL' ? row.call : row.put)
