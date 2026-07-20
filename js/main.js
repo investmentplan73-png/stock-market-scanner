@@ -3973,6 +3973,17 @@ async function runBtstBackgroundScan(targets) {
 
             // Find best option in the confirmed direction
             const wantedSide = direction === 'BULLISH' ? 'CALL' : 'PUT';
+
+            // MARKET MOOD CHECK: Don't trade against overall market direction
+            if (typeof getMarketMood === 'function') {
+                const mood = getMarketMood();
+                if (mood) {
+                    const moodDirection = mood.direction || '';
+                    if (moodDirection === 'BULLISH' && wantedSide === 'PUT') continue;
+                    if (moodDirection === 'BEARISH' && wantedSide === 'CALL') continue;
+                }
+            }
+
             const candidates = evaluation.rows
                 .map(row => wantedSide === 'CALL' ? row.call : row.put)
                 .filter(item => item.score >= minConfidence && item.action !== 'NO TRADE')

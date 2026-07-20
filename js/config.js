@@ -143,17 +143,17 @@ const Config = {
     
     // Signal Thresholds
     signals: {
-        minConfidence: 70,
-        buyThreshold: 0.7,
-        sellThreshold: -0.7
+        minConfidence: 78,
+        buyThreshold: 0.8,
+        sellThreshold: -0.8
     },
 
     // Options scanner settings. Keep this practical for live Angel One data:
     // some quote fields such as option volume can be missing.
     optionScanner: {
-        minConfidence: 70,
-        minBuyScore: 76,
-        strongConfidence: 80,
+        minConfidence: 78,
+        minBuyScore: 82,
+        strongConfidence: 85,
         maxOptionRiskPercent: 30,
         firstTargetRiskReward: 1.8,
         secondTargetRiskReward: 2.8,
@@ -164,7 +164,7 @@ const Config = {
         minWatchScore: 62,
         maxBuyWarnings: 2,
         maxWatchWarnings: 3,
-        minRewardRiskForBuy: 1.25,
+        minRewardRiskForBuy: 1.8,
         stopLoss: {
             confirmations: 2, // FIX: Was 1, now 2 - need 2 touches to confirm SL
             fallbackRiskPercent: 28, // FIX: Was 24, wider buffer
@@ -187,15 +187,15 @@ const Config = {
         minVolume: 1,
         requireOptionVolume: false,
         requireOptionMomentum: true,
-        minTrendStrengthForBuy: 56,
-        minAdxForBuy: 18,
+        minTrendStrengthForBuy: 62,
+        minAdxForBuy: 22,
         btst: {
             enabled: true,
             timeframes: ['ONE_DAY'],
-            minConfidence: 82,
-            minTrendStrength: 55,
+            minConfidence: 88,
+            minTrendStrength: 65,
             minDaysToExpiry: 1.2,
-            maxWarnings: 2
+            maxWarnings: 1
         },
         swing: {
             enabled: true,
@@ -286,8 +286,8 @@ const Config = {
         useAllFnoStocks: true,
         includeCommodities: true,
         marketMoodFilter: {
-            enabled: false,
-            minScoreAgainstMood: 72
+            enabled: true,
+            minScoreAgainstMood: 90
         },
         stockSymbols: [
             'RELIANCE',
