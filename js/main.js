@@ -379,6 +379,16 @@ function markLiveDataUnavailable(message, source = 'data') {
     liveDataFailureCount += 1;
     const cleanMessage = message || 'Live market data is not available.';
     const authFailure = isAuthFailure(cleanMessage);
+
+    // Check if market is closed - don't retry aggressively
+    const marketClosed = typeof isMarketOpenForSegment === 'function' && !isMarketOpenForSegment('INDEX');
+    if (marketClosed && !authFailure) {
+        setStatus('Market Closed', true);
+        document.getElementById('lastUpdate').textContent = 'Market is closed. Waiting for market hours.';
+        nextMarketDataFetchAt = Date.now() + 300000; // Check again in 5 min
+        return;
+    }
+
     const retryDelayMs = source === 'ltp' && !authFailure ? scheduleLiveDataRetry() : 0;
     setStatus(authFailure ? 'Session expired' : 'Connected, retrying', !authFailure && AngelOneAPI.isConnected);
     document.getElementById('lastUpdate').textContent = authFailure
