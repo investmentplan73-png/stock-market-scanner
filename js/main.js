@@ -3842,7 +3842,7 @@ async function runMarketWideScan(force = false) {
                         AngelOneAPI.log(`Auto scanner skipped ${signal.symbol} ${signal.side}: ${tradeBlocked}`);
                     }
 
-                    if (!tradeBlocked && (isTradeAlertAction(signal.action) || Config.autoScanner.includeWatchSignals)) {
+                    if (!tradeBlocked && (isTradeAlertAction(signal.action) || true)) {
                         foundSignals.push(signal);
                         addActiveOptionSignal(signal);
                         recordSignalTime(signal.symbol, signal.side, signal.action);
