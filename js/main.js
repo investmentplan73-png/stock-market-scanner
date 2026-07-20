@@ -380,7 +380,7 @@ function markLiveDataUnavailable(message, source = 'data') {
     const cleanMessage = message || 'Live market data is not available.';
     const authFailure = isAuthFailure(cleanMessage);
     const retryDelayMs = source === 'ltp' && !authFailure ? scheduleLiveDataRetry() : 0;
-    setStatus(authFailure ? 'Session expired' : 'Connected, retrying', !authFailure && AngelOneAPI.isConnected);
+    setStatus(authFailure ? 'Session expired' : `Retry: ${cleanMessage.slice(0, 60)}`, !authFailure && AngelOneAPI.isConnected);
     document.getElementById('lastUpdate').textContent = authFailure
         ? 'Last Update: Failed'
         : retryDelayMs
