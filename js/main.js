@@ -4897,6 +4897,7 @@ function createOptionSignalCard(signal) {
             bypassDuplicate: true,
             bypassCooldown: true,
             bypassScore: true,
+            bypassMarketHours: true,
             allowWatch: true
         });
 

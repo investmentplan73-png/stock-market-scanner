@@ -218,6 +218,7 @@ const TelegramNotifier = {
 
         if (typeof isMarketOpenForSegment === 'function'
             && !options.bypassMarketHours
+            && !options.manual
             && !isMarketOpenForSegment(signal.segment || 'INDEX')) {
             const reason = typeof getMarketClosedReason === 'function'
                 ? getMarketClosedReason(signal.segment || 'INDEX')
