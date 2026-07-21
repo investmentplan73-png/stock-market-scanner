@@ -286,14 +286,17 @@
             <div class="form-group angelone-field"><label for="clientId">Client ID</label><input type="text" id="clientId" placeholder="Client ID" autocomplete="off"></div>
             <div class="form-group angelone-field"><label for="totpSecret">TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP" autocomplete="one-time-code"></div>
             <!-- Upstox Fields -->
-            <div class="form-group upstox-field hidden"><label for="upstoxAccessToken">Access Token</label><input type="text" id="upstoxAccessToken" placeholder="Paste your Upstox access token" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxApiKey">API Key</label><input type="text" id="upstoxApiKey" placeholder="Upstox API Key" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxApiSecret">API Secret</label><input type="password" id="upstoxApiSecret" placeholder="Upstox API Secret" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxAccessToken">Access Token</label><input type="text" id="upstoxAccessToken" placeholder="Paste access token (or click Upstox Login)" autocomplete="off"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
+                <button class="btn btn-small upstox-field hidden" onclick="upstoxLogin()" style="background:#4fd1c5;color:#000;font-weight:700">Upstox Login</button>
             </div>
         </div>
         <p class="helper-text" id="apiLoginError"></p>
-        <p class="helper-text upstox-field hidden" style="margin-top:8px;color:#4fd1c5">Upstox: Sirf Access Token paste karo aur Connect dabao. Token next day 3:30 AM tak valid rehta hai.</p>
+        <p class="helper-text upstox-field hidden" style="margin-top:8px;color:#4fd1c5">Upstox: API Key + Secret daalo → "Upstox Login" click karo → Login karo → Token auto-fill ho jayega → Connect dabao.</p>
     </div>
 
     <main class="dashboard" id="dashboard" style="display:none">
@@ -547,7 +550,8 @@
 
 <script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}
 function toggleBrokerFields(){var v=document.getElementById('brokerSelect').value;document.querySelectorAll('.angelone-field').forEach(function(el){el.classList.toggle('hidden',v!=='angelone')});document.querySelectorAll('.upstox-field').forEach(function(el){el.classList.toggle('hidden',v!=='upstox')});}
-function upstoxLogin(){var key=document.getElementById('upstoxApiKey').value.trim();var redirect=document.getElementById('upstoxRedirectUri').value.trim()||window.location.origin+'/callback';if(!key){alert('Upstox API Key daalo pehle');return;}var url='https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id='+encodeURIComponent(key)+'&redirect_uri='+encodeURIComponent(redirect);window.open(url,'_blank');}
+function upstoxLogin(){var key=document.getElementById('upstoxApiKey').value.trim();var redirect=window.location.origin+'/callback';if(!key){alert('Pehle Upstox API Key daalo');return;}var url='https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id='+encodeURIComponent(key)+'&redirect_uri='+encodeURIComponent(redirect);window.open(url,'_blank');window.addEventListener('message',function handler(e){if(e.data&&e.data.type==='upstox-code'){window.removeEventListener('message',handler);fetchUpstoxToken(e.data.code);}});}
+async function fetchUpstoxToken(code){var key=document.getElementById('upstoxApiKey').value.trim();var secret=document.getElementById('upstoxApiSecret').value.trim();if(!key||!secret||!code){alert('API Key, Secret aur code chahiye');return;}try{var res=await fetch(window.location.origin+'/api/upstox/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,apiSecret:secret,code:code,redirectUri:window.location.origin+'/callback'})});var data=await res.json();if(data.access_token){document.getElementById('upstoxAccessToken').value=data.access_token;alert('Token mil gaya! Ab Connect dabao.');}else{alert('Token failed: '+(data.error||data.message||'Unknown error'));}}catch(e){alert('Error: '+e.message);}}
 </script>
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
