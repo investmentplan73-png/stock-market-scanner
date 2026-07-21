@@ -424,7 +424,10 @@ async function runUpstoxOptionScan() {
             });
             const chainData = await response.json();
             
+            AngelOneAPI.log(`Upstox chain (${target.symbol}): status=${chainData.status}, records=${chainData.data?.length || 0}`);
+            
             if (chainData.status !== 'success' || !chainData.data?.length) {
+                AngelOneAPI.log(`Upstox chain failed: ${JSON.stringify(chainData.errors || chainData.message || 'no data').slice(0, 100)}`);
                 await new Promise(r => setTimeout(r, 2000));
                 continue;
             }
@@ -551,6 +554,13 @@ async function fetchUpstoxMarketData() {
         const quotes = data.data || {};
         let updatedCount = 0;
 
+        // Log first quote for debugging
+        const firstKey = Object.keys(quotes)[0];
+        if (firstKey && !window._upstoxLoggedOnce) {
+            window._upstoxLoggedOnce = true;
+            AngelOneAPI.log(`Upstox quote format: ${JSON.stringify(quotes[firstKey]).slice(0, 200)}`);
+        }
+
         const upstoxToSymbol = {
             'NSE_INDEX:Nifty 50': 'NIFTY',
             'NSE_INDEX:Nifty Bank': 'BANKNIFTY',
@@ -581,10 +591,23 @@ async function fetchUpstoxMarketData() {
         Object.entries(quotes).forEach(([key, quote]) => {
             const symbol = upstoxToSymbol[key];
             if (!symbol || !quote) return;
-            const ltp = Number(quote.last_price || 0);
-            const prevClose = Number(quote.ohlc?.close || quote.close_price || 0);
-            const change = prevClose > 0 ? ltp - prevClose : Number(quote.net_change || 0);
-            const changePercent = prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : Number(quote.percentage_change || 0);
+            const ltp = Number(quote.last_price || quote.ltp || 0);
+            const prevClose = Number(quote.ohlc?.close || quote.previous_close || quote.close_price || quote.prev_close || 0);
+            const openPrice = Number(quote.ohlc?.open || quote.open || 0);
+            const netChange = Number(quote.net_change || 0);
+            const pctChange = Number(quote.percentage_change || quote.pct_change || 0);
+            
+            // Calculate change - try multiple methods
+            let change = netChange;
+            let changePercent = pctChange;
+            if (!change && prevClose > 0 && ltp > 0) {
+                change = ltp - prevClose;
+                changePercent = ((ltp - prevClose) / prevClose) * 100;
+            }
+            if (!change && openPrice > 0 && ltp > 0) {
+                change = ltp - openPrice;
+                changePercent = ((ltp - openPrice) / openPrice) * 100;
+            }
 
             if (ltp > 0) {
                 latestPricesBySymbol[symbol] = ltp;
