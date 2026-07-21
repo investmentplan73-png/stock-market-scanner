@@ -266,19 +266,18 @@ async function connectAPI() {
 
 async function connectUpstox() {
     const accessToken = document.getElementById('upstoxAccessToken')?.value.trim() || '';
-    const apiKey = document.getElementById('upstoxApiKey')?.value.trim() || '';
     const loginError = document.getElementById('apiLoginError');
     if (loginError) loginError.textContent = '';
 
     if (!accessToken) {
-        if (loginError) loginError.textContent = 'Access Token required. Click "Upstox Login" to get token, then paste it.';
-        alert('Upstox Access Token daalo. Pehle "Upstox Login" pe click karo, login karo, token copy karke paste karo.');
+        if (loginError) loginError.textContent = 'Access Token required. Apna Upstox access token paste karo.';
+        alert('Upstox Access Token daalo.');
         return;
     }
 
     setStatus('Connecting Upstox...', false);
 
-    // Test the token by fetching a market quote
+    // Test the token by fetching NIFTY 50 quote
     try {
         const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/market-data`, {
             method: 'POST',
@@ -291,30 +290,110 @@ async function connectUpstox() {
         const data = await response.json();
 
         if (data.status === 'error' || data.errors) {
-            const errMsg = data.errors?.[0]?.message || data.message || 'Upstox token invalid or expired';
-            setStatus('Upstox connection failed', false);
+            const errMsg = data.errors?.[0]?.message || data.message || 'Upstox token invalid or expired. Naya token generate karo.';
+            setStatus('Upstox failed', false);
             if (loginError) loginError.textContent = errMsg;
             return;
         }
 
-        // Store Upstox config
+        // Connected! Store token
         isDemoMode = false;
-        Config.apiKey = apiKey;
-        Config.accessToken = accessToken;
-        Config.clientId = 'UPSTOX';
         window._upstoxToken = accessToken;
         window._activeBroker = 'upstox';
-        Config.saveConfig();
+        AngelOneAPI.isConnected = true;
 
         liveDataFailureCount = 0;
-        AngelOneAPI.isConnected = true;
         setStatus('Connected (Upstox)', true);
         showDashboard();
-        startMarketDataUpdates();
-        AngelOneAPI.log('Connected to Upstox API successfully.');
+
+        // Start Upstox market data polling
+        stopMarketDataUpdates();
+        fetchUpstoxMarketData();
+        marketDataInterval = setInterval(fetchUpstoxMarketData, 5000);
+        AngelOneAPI.log('Connected to Upstox API. Live market data active.');
     } catch (error) {
         setStatus('Upstox connection failed', false);
         if (loginError) loginError.textContent = 'Network error: ' + error.message;
+    }
+}
+
+async function fetchUpstoxMarketData() {
+    if (!window._upstoxToken) return;
+
+    try {
+        // Fetch all major indices
+        const indexKeys = [
+            'NSE_INDEX|Nifty 50',
+            'NSE_INDEX|Nifty Bank',
+            'NSE_INDEX|Nifty Fin Service',
+            'NSE_INDEX|NIFTY MID SELECT',
+            'BSE_INDEX|SENSEX',
+            'BSE_INDEX|BANKEX'
+        ].join(',');
+
+        const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/market-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accessToken: window._upstoxToken,
+                instruments: indexKeys
+            })
+        });
+        const data = await response.json();
+
+        if (data.status === 'error') {
+            markLiveDataUnavailable(data.errors?.[0]?.message || 'Upstox data error', 'ltp');
+            return;
+        }
+
+        // Parse Upstox response and update UI
+        const quotes = data.data || {};
+        let updatedCount = 0;
+
+        const upstoxToSymbol = {
+            'NSE_INDEX:Nifty 50': 'NIFTY',
+            'NSE_INDEX:Nifty Bank': 'BANKNIFTY',
+            'NSE_INDEX:Nifty Fin Service': 'FINNIFTY',
+            'NSE_INDEX:NIFTY MID SELECT': 'MIDCPNIFTY',
+            'BSE_INDEX:SENSEX': 'SENSEX',
+            'BSE_INDEX:BANKEX': 'BANKEX'
+        };
+
+        Object.entries(quotes).forEach(([key, quote]) => {
+            const symbol = upstoxToSymbol[key];
+            if (!symbol || !quote) return;
+            const ltp = quote.last_price || quote.ltp || 0;
+            const change = quote.net_change || 0;
+            const changePercent = quote.percentage_change || 0;
+            const ohlc = quote.ohlc || {};
+
+            if (ltp > 0) {
+                latestPricesBySymbol[symbol] = ltp;
+                latestChangeBySymbol[symbol] = { points: change, percent: changePercent };
+                updatedCount++;
+
+                // Update index card UI
+                const prefix = symbol.toLowerCase().replace(/\s/g, '');
+                const priceEl = document.getElementById(`${prefix}Price`);
+                const changeEl = document.getElementById(`${prefix}Change`);
+                if (priceEl) priceEl.textContent = ltp.toFixed(2);
+                if (changeEl) {
+                    changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`;
+                    changeEl.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+                }
+            }
+        });
+
+        if (updatedCount > 0) {
+            liveDataFailureCount = 0;
+            setStatus('Connected (Upstox)', true);
+            updateLastUpdateTime();
+            updateMarketBreadth();
+        } else {
+            markLiveDataUnavailable('No Upstox data received', 'ltp');
+        }
+    } catch (error) {
+        markLiveDataUnavailable('Upstox: ' + error.message, 'ltp');
     }
 }
 
