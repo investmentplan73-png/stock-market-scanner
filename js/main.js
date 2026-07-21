@@ -244,6 +244,7 @@ async function connectAPI() {
     }
 
     isDemoMode = false;
+    window._activeBroker = 'angelone';
     Config.apiKey = apiKey;
     Config.apiSecret = apiSecret;
     Config.clientId = clientId;
@@ -928,6 +929,9 @@ function showDashboard() {
 function startMarketDataUpdates() {
     stopMarketDataUpdates();
 
+    // Skip if using alternative broker (they have their own data loop)
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
+
     if (!isDemoMode) {
         AngelOneAPI.initWebSocket();
         fetchMarketData();
@@ -979,6 +983,7 @@ window.handleWebSocketTick = function(tick) {
 
 async function fetchMarketData() {
     if (isDemoMode) return;
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
     if (!AngelOneAPI.isConnected) return;
     if (isFetchingMarketData) return;
     if (Date.now() < nextMarketDataFetchAt) return;
@@ -4444,6 +4449,10 @@ function startOptionAutoRefresh() {
 
 function startMarketWideAutoScan() {
     stopMarketWideAutoScan();
+    
+    // Skip Angel One scanner when using alternative broker
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
+    
     autoScanState.enabled = Config.autoScanner.enabled;
     updateMarketScannerControls();
 

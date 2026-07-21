@@ -948,9 +948,10 @@ function refreshInstrumentMasterInBackground() {
 
 async function downloadInstrumentMaster() {
     let lastError = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-            const response = await fetch(INSTRUMENT_MASTER_URL, { signal: AbortSignal.timeout(60000) });
+            console.log(`Instrument master download attempt ${attempt}...`);
+            const response = await fetch(INSTRUMENT_MASTER_URL, { signal: AbortSignal.timeout(120000) });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
