@@ -336,37 +336,44 @@
         <section class="market-breadth" id="marketBreadth" aria-label="Market breadth">
             <div class="breadth-card">
                 <span class="breadth-label">NSE Indices</span>
-                <span class="breadth-up" id="breadthIndexUp">0</span>
+                <span class="breadth-up clickable" id="breadthIndexUp" onclick="showBreadthList('nse-index','up')" title="Click to see green indices">0</span>
                 <span class="breadth-separator">/</span>
-                <span class="breadth-down" id="breadthIndexDown">0</span>
+                <span class="breadth-down clickable" id="breadthIndexDown" onclick="showBreadthList('nse-index','down')" title="Click to see red indices">0</span>
                 <span class="breadth-total" id="breadthIndexTotal">(0)</span>
                 <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthIndexBar" style="width:50%"></span></span>
             </div>
             <div class="breadth-card">
                 <span class="breadth-label">BSE Indices</span>
-                <span class="breadth-up" id="breadthBseUp">0</span>
+                <span class="breadth-up clickable" id="breadthBseUp" onclick="showBreadthList('bse-index','up')" title="Click to see green indices">0</span>
                 <span class="breadth-separator">/</span>
-                <span class="breadth-down" id="breadthBseDown">0</span>
+                <span class="breadth-down clickable" id="breadthBseDown" onclick="showBreadthList('bse-index','down')" title="Click to see red indices">0</span>
                 <span class="breadth-total" id="breadthBseTotal">(0)</span>
                 <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthBseBar" style="width:50%"></span></span>
             </div>
             <div class="breadth-card">
                 <span class="breadth-label">NSE Stocks</span>
-                <span class="breadth-up" id="breadthStockUp">0</span>
+                <span class="breadth-up clickable" id="breadthStockUp" onclick="showBreadthList('nse-stock','up')" title="Click to see green stocks">0</span>
                 <span class="breadth-separator">/</span>
-                <span class="breadth-down" id="breadthStockDown">0</span>
+                <span class="breadth-down clickable" id="breadthStockDown" onclick="showBreadthList('nse-stock','down')" title="Click to see red stocks">0</span>
                 <span class="breadth-total" id="breadthStockTotal">(0)</span>
                 <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthStockBar" style="width:50%"></span></span>
             </div>
             <div class="breadth-card">
                 <span class="breadth-label">BSE Stocks</span>
-                <span class="breadth-up" id="breadthBseStockUp">0</span>
+                <span class="breadth-up clickable" id="breadthBseStockUp" onclick="showBreadthList('bse-stock','up')" title="Click to see green stocks">0</span>
                 <span class="breadth-separator">/</span>
-                <span class="breadth-down" id="breadthBseStockDown">0</span>
+                <span class="breadth-down clickable" id="breadthBseStockDown" onclick="showBreadthList('bse-stock','down')" title="Click to see red stocks">0</span>
                 <span class="breadth-total" id="breadthBseStockTotal">(0)</span>
                 <span class="breadth-bar"><span class="breadth-bar-fill" id="breadthBseStockBar" style="width:50%"></span></span>
             </div>
         </section>
+        <!-- Breadth Detail Popup -->
+        <div id="breadthPopup" class="breadth-popup hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+            <div class="breadth-popup-card">
+                <div class="breadth-popup-header"><h3 id="breadthPopupTitle">--</h3><button onclick="document.getElementById('breadthPopup').classList.add('hidden')" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">&times;</button></div>
+                <div class="breadth-popup-list" id="breadthPopupList"></div>
+            </div>
+        </div>
 
         <!-- P&L -->
         <section class="pnl-summary" aria-label="Profit and Loss summary">

@@ -809,18 +809,25 @@ function updateMarketBreadth() {
     // BSE Stocks count
     let bseStockUp = 0, bseStockDown = 0;
 
+    // Reset breadth data for popup
+    breadthData = { 'nse-index': [], 'bse-index': [], 'nse-stock': [], 'bse-stock': [] };
+
     // Count indices from latestChangeBySymbol
     Object.entries(latestChangeBySymbol).forEach(([symbol, changeInfo]) => {
         if (!changeInfo) return;
         const points = Number(changeInfo.points || 0);
+        const percent = Number(changeInfo.percent || 0);
         if (!points) return;
 
         if (indexUiMap[symbol]) {
             const exchange = Config.indexExchanges[symbol] || 'NSE';
+            const item = { name: symbol, change: points, changePercent: percent };
             if (exchange === 'BSE') {
                 if (points > 0) bseIndexUp++; else bseIndexDown++;
+                breadthData['bse-index'].push(item);
             } else {
                 if (points > 0) nseIndexUp++; else nseIndexDown++;
+                breadthData['nse-index'].push(item);
             }
         }
     });
@@ -831,23 +838,17 @@ function updateMarketBreadth() {
             const change = latestChangeBySymbol[stock.symbol];
             if (!change) return;
             const points = Number(change.points || 0);
+            const percent = Number(change.percent || 0);
             if (!points) return;
             const exchange = String(stock.exchange || 'NSE').toUpperCase();
+            const item = { name: stock.symbol, change: points, changePercent: percent };
             if (exchange === 'BSE') {
                 if (points > 0) bseStockUp++; else bseStockDown++;
+                breadthData['bse-stock'].push(item);
             } else {
                 if (points > 0) nseStockUp++; else nseStockDown++;
+                breadthData['nse-stock'].push(item);
             }
-        });
-    }
-
-    // Count from scan signal cards as fallback for stocks
-    if (!nseStockUp && !nseStockDown) {
-        const scanResults = document.querySelectorAll('#marketScanResults .signal-card');
-        scanResults.forEach(card => {
-            const text = card.textContent || '';
-            if (/BUY\s*(CALL)?|BTST\s*(CALL)?|SWING\s*(CALL)?/i.test(text)) nseStockUp++;
-            else if (/BUY\s*PUT|BTST\s*PUT|SWING\s*PUT/i.test(text)) nseStockDown++;
         });
     }
 
@@ -877,6 +878,37 @@ function updateBreadthCard(upId, downId, barId, totalId, up, down, total) {
     if (downEl) downEl.textContent = down;
     if (barEl) barEl.style.width = total > 0 ? `${(up / total) * 100}%` : '50%';
     if (totalEl) totalEl.textContent = `(${total})`;
+}
+
+// Store breadth data for popup
+let breadthData = { 'nse-index': [], 'bse-index': [], 'nse-stock': [], 'bse-stock': [] };
+
+function showBreadthList(category, direction) {
+    const popup = document.getElementById('breadthPopup');
+    const title = document.getElementById('breadthPopupTitle');
+    const list = document.getElementById('breadthPopupList');
+    if (!popup || !list) return;
+
+    const dirLabel = direction === 'up' ? 'Green (Up)' : 'Red (Down)';
+    const catLabels = { 'nse-index': 'NSE Indices', 'bse-index': 'BSE Indices', 'nse-stock': 'NSE Stocks', 'bse-stock': 'BSE Stocks' };
+    title.textContent = `${catLabels[category] || category} - ${dirLabel}`;
+
+    const items = (breadthData[category] || []).filter(item =>
+        direction === 'up' ? item.change > 0 : item.change < 0
+    ).sort((a, b) => direction === 'up' ? b.change - a.change : a.change - b.change);
+
+    if (!items.length) {
+        list.innerHTML = '<div style="text-align:center;color:#6b7b8f;padding:20px">No data available</div>';
+    } else {
+        list.innerHTML = items.map(item => `
+            <div class="breadth-popup-item ${item.change > 0 ? 'bp-up' : 'bp-down'}">
+                <span class="bp-name">${item.name}</span>
+                <span class="bp-change">${item.change > 0 ? '+' : ''}${item.changePercent.toFixed(2)}%</span>
+            </div>
+        `).join('');
+    }
+
+    popup.classList.remove('hidden');
 }
 
 function hasRecentMarketQuote(symbol, maxAgeMs = 15000) {
