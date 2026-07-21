@@ -320,7 +320,11 @@ async function connectUpstox() {
 
         // Also fetch historical for indicators
         updateUpstoxIndicators();
-        updateInterval = setInterval(updateUpstoxIndicators, 180000);
+        updateInterval = setInterval(updateUpstoxIndicators, 120000);
+        
+        // Start Upstox option scan every 60 seconds
+        setTimeout(runUpstoxOptionScan, 10000);
+        setInterval(runUpstoxOptionScan, 60000);
 
         AngelOneAPI.log('Connected to Upstox API. Live market data active.');
     } catch (error) {
@@ -373,6 +377,115 @@ async function updateUpstoxIndicators() {
     }
     
     refreshDisplayedIndicators();
+    
+    // Run Upstox option chain scan after indicators
+    runUpstoxOptionScan();
+}
+
+// ==================== UPSTOX OPTION CHAIN SCANNER ====================
+let upstoxScanRunning = false;
+
+async function runUpstoxOptionScan() {
+    if (!window._upstoxToken || upstoxScanRunning) return;
+    upstoxScanRunning = true;
+    
+    const scanTargets = [
+        { symbol: 'NIFTY', instrumentKey: 'NSE_INDEX|Nifty 50' },
+        { symbol: 'BANKNIFTY', instrumentKey: 'NSE_INDEX|Nifty Bank' }
+    ];
+    
+    updateText('marketScanStatus', 'Scanning (Upstox)...');
+    
+    try {
+        for (const target of scanTargets) {
+            const spot = latestPricesBySymbol[target.symbol];
+            if (!spot) continue;
+            
+            // Fetch option chain from Upstox
+            const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/option-chain`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accessToken: window._upstoxToken,
+                    instrumentKey: target.instrumentKey
+                })
+            });
+            const chainData = await response.json();
+            
+            if (chainData.status !== 'success' || !chainData.data?.length) {
+                await new Promise(r => setTimeout(r, 2000));
+                continue;
+            }
+            
+            // Parse Upstox option chain into our format
+            const calls = {};
+            const puts = {};
+            const strikeStep = target.symbol === 'NIFTY' ? 50 : 100;
+            const atmStrike = Math.round(spot / strikeStep) * strikeStep;
+            
+            chainData.data.forEach(row => {
+                const strike = Number(row.strike_price || 0);
+                if (!strike || Math.abs(strike - atmStrike) > strikeStep * 5) return;
+                
+                if (row.call_options) {
+                    const ce = row.call_options.market_data || {};
+                    calls[strike] = {
+                        ltp: Number(ce.ltp || 0),
+                        change: Number(ce.net_change || 0),
+                        volume: Number(ce.volume || 0),
+                        oi: Number(ce.oi || 0),
+                        iv: Number(row.call_options.option_greeks?.iv || 0),
+                        delta: Number(row.call_options.option_greeks?.delta || 0),
+                        token: row.call_options.instrument_key || '',
+                        lotSize: Number(row.call_options.market_data?.lot_size || 0)
+                    };
+                }
+                if (row.put_options) {
+                    const pe = row.put_options.market_data || {};
+                    puts[strike] = {
+                        ltp: Number(pe.ltp || 0),
+                        change: Number(pe.net_change || 0),
+                        volume: Number(pe.volume || 0),
+                        oi: Number(pe.oi || 0),
+                        iv: Number(row.put_options.option_greeks?.iv || 0),
+                        delta: Number(row.put_options.option_greeks?.delta || 0),
+                        token: row.put_options.instrument_key || '',
+                        lotSize: Number(row.put_options.market_data?.lot_size || 0)
+                    };
+                }
+            });
+            
+            // Use existing signal engine to evaluate
+            const indicators = latestIndicatorsBySymbol[target.symbol] || {};
+            const chainForEngine = { spotPrice: spot, calls, puts, expiryDate: '' };
+            const evaluation = OptionSignalEngine.evaluateChain(target.symbol, chainForEngine, indicators, spot, { timeframe: 'FIVE_MINUTE' });
+            
+            if (evaluation.best && isTradeAlertAction(evaluation.best.action)) {
+                evaluation.best.source = 'Upstox Scan';
+                evaluation.best.segment = 'INDEX';
+                addActiveOptionSignal(evaluation.best);
+                AngelOneAPI.log(`Upstox signal: ${evaluation.best.action} ${target.symbol} ${evaluation.best.strike} ${evaluation.best.side} score ${evaluation.best.score}%`);
+                TelegramNotifier.sendOptionSignal(evaluation.best);
+                registerOptionTrade(evaluation.best, {});
+            } else if (evaluation.best) {
+                evaluation.best.source = 'Upstox Scan';
+                addActiveOptionSignal(evaluation.best);
+            }
+            
+            // Update option summary
+            renderOptionSummary(evaluation);
+            
+            await new Promise(r => setTimeout(r, 3000));
+        }
+        
+        updateText('marketScanStatus', 'Scan complete (Upstox)');
+        updateText('marketScanLastRun', new Date().toLocaleTimeString());
+    } catch (error) {
+        AngelOneAPI.log(`Upstox scan error: ${error.message}`);
+        updateText('marketScanStatus', 'Scan error');
+    } finally {
+        upstoxScanRunning = false;
+    }
 }
 
 async function fetchUpstoxMarketData() {
