@@ -321,14 +321,32 @@ async function fetchUpstoxMarketData() {
     if (!window._upstoxToken) return;
 
     try {
-        // Fetch all major indices
+        // Fetch all major indices + sectoral
         const indexKeys = [
             'NSE_INDEX|Nifty 50',
             'NSE_INDEX|Nifty Bank',
             'NSE_INDEX|Nifty Fin Service',
             'NSE_INDEX|NIFTY MID SELECT',
             'BSE_INDEX|SENSEX',
-            'BSE_INDEX|BANKEX'
+            'BSE_INDEX|BANKEX',
+            'NSE_INDEX|India VIX',
+            'NSE_INDEX|Nifty IT',
+            'NSE_INDEX|Nifty Pharma',
+            'NSE_INDEX|Nifty Auto',
+            'NSE_INDEX|Nifty Metal',
+            'NSE_INDEX|Nifty Energy',
+            'NSE_INDEX|Nifty FMCG',
+            'NSE_INDEX|Nifty Realty',
+            'NSE_INDEX|Nifty PSU Bank',
+            'NSE_INDEX|Nifty Private Bank',
+            'NSE_INDEX|Nifty Infra',
+            'NSE_INDEX|Nifty Healthcare',
+            'NSE_INDEX|Nifty Consumer Durables',
+            'NSE_INDEX|Nifty Oil and Gas',
+            'NSE_INDEX|Nifty Commodities',
+            'NSE_INDEX|Nifty Media',
+            'NSE_INDEX|Nifty Next 50',
+            'NSE_INDEX|NIFTY SMLCAP 100'
         ].join(',');
 
         const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/market-data`, {
@@ -356,16 +374,34 @@ async function fetchUpstoxMarketData() {
             'NSE_INDEX:Nifty Fin Service': 'FINNIFTY',
             'NSE_INDEX:NIFTY MID SELECT': 'MIDCPNIFTY',
             'BSE_INDEX:SENSEX': 'SENSEX',
-            'BSE_INDEX:BANKEX': 'BANKEX'
+            'BSE_INDEX:BANKEX': 'BANKEX',
+            'NSE_INDEX:India VIX': 'INDIAVIX',
+            'NSE_INDEX:Nifty IT': 'NIFTYIT',
+            'NSE_INDEX:Nifty Pharma': 'NIFTYPHARMA',
+            'NSE_INDEX:Nifty Auto': 'NIFTYAUTO',
+            'NSE_INDEX:Nifty Metal': 'NIFTYMETAL',
+            'NSE_INDEX:Nifty Energy': 'NIFTYENERGY',
+            'NSE_INDEX:Nifty FMCG': 'NIFTYFMCG',
+            'NSE_INDEX:Nifty Realty': 'NIFTYREALTY',
+            'NSE_INDEX:Nifty PSU Bank': 'NIFTYPSUBANK',
+            'NSE_INDEX:Nifty Private Bank': 'NIFTYPVTBANK',
+            'NSE_INDEX:Nifty Infra': 'NIFTYINFRA',
+            'NSE_INDEX:Nifty Healthcare': 'NIFTYHEALTHCARE',
+            'NSE_INDEX:Nifty Consumer Durables': 'NIFTYCONSUMER',
+            'NSE_INDEX:Nifty Oil and Gas': 'NIFTYOILGAS',
+            'NSE_INDEX:Nifty Commodities': 'NIFTYCOMMODITIES',
+            'NSE_INDEX:Nifty Media': 'NIFTYMEDIA',
+            'NSE_INDEX:Nifty Next 50': 'NIFTYNEXT50',
+            'NSE_INDEX:NIFTY SMLCAP 100': 'NIFTYSMLCAP'
         };
 
         Object.entries(quotes).forEach(([key, quote]) => {
             const symbol = upstoxToSymbol[key];
             if (!symbol || !quote) return;
-            const ltp = quote.last_price || quote.ltp || 0;
-            const change = quote.net_change || 0;
-            const changePercent = quote.percentage_change || 0;
-            const ohlc = quote.ohlc || {};
+            const ltp = Number(quote.last_price || 0);
+            const prevClose = Number(quote.ohlc?.close || quote.close_price || 0);
+            const change = prevClose > 0 ? ltp - prevClose : Number(quote.net_change || 0);
+            const changePercent = prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : Number(quote.percentage_change || 0);
 
             if (ltp > 0) {
                 latestPricesBySymbol[symbol] = ltp;
@@ -373,7 +409,7 @@ async function fetchUpstoxMarketData() {
                 updatedCount++;
 
                 // Update index card UI
-                const prefix = symbol.toLowerCase().replace(/\s/g, '');
+                const prefix = symbol.toLowerCase();
                 const priceEl = document.getElementById(`${prefix}Price`);
                 const changeEl = document.getElementById(`${prefix}Change`);
                 if (priceEl) priceEl.textContent = ltp.toFixed(2);
