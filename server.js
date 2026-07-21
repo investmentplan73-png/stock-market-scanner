@@ -58,6 +58,11 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        if (req.url.startsWith('/callback')) {
+            serveUpstoxCallback(req, res);
+            return;
+        }
+
         serveStatic(req, res);
     } catch (error) {
         sendJson(res, 500, {
@@ -293,6 +298,25 @@ async function handleApi(req, res) {
     if (req.url === '/api/telegram-send') {
         const data = await sendTelegramMessage(body);
         sendJson(res, data.ok ? 200 : 400, data);
+        return;
+    }
+
+    // ==================== UPSTOX API PROXY ====================
+    if (req.url === '/api/upstox/token') {
+        const data = await getUpstoxToken(body);
+        sendJson(res, data.access_token ? 200 : 400, data);
+        return;
+    }
+
+    if (req.url === '/api/upstox/market-data') {
+        const data = await getUpstoxMarketData(body);
+        sendJson(res, 200, data);
+        return;
+    }
+
+    if (req.url === '/api/upstox/historical') {
+        const data = await getUpstoxHistorical(body);
+        sendJson(res, 200, data);
         return;
     }
 
@@ -2474,4 +2498,86 @@ function saveAppSetting(key, value) {
     const settings = loadAppSettings();
     settings[key] = value;
     saveAppSettings(settings);
+}
+
+// ==================== UPSTOX API FUNCTIONS ====================
+
+const UPSTOX_BASE = 'https://api.upstox.com/v2';
+
+async function getUpstoxToken(body) {
+    const { apiKey, apiSecret, code, redirectUri } = body;
+    if (!apiKey || !apiSecret || !code) {
+        return { error: 'API Key, Secret, and authorization code are required' };
+    }
+
+    try {
+        const response = await fetch(`${UPSTOX_BASE}/login/authorization/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                code,
+                client_id: apiKey,
+                client_secret: apiSecret,
+                redirect_uri: redirectUri || 'https://stock-market-scanner.onrender.com/callback',
+                grant_type: 'authorization_code'
+            }).toString()
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        return { error: error.message };
+    }
+}
+
+async function getUpstoxMarketData(body) {
+    const { accessToken, instruments } = body;
+    if (!accessToken || !instruments) {
+        return { status: false, message: 'Access token and instruments required' };
+    }
+
+    try {
+        const instrumentKeys = Array.isArray(instruments) ? instruments.join(',') : instruments;
+        const response = await fetch(`${UPSTOX_BASE}/market-quote/quotes?instrument_key=${encodeURIComponent(instrumentKeys)}`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: 'application/json'
+            }
+        });
+        return await response.json();
+    } catch (error) {
+        return { status: false, message: error.message };
+    }
+}
+
+async function getUpstoxHistorical(body) {
+    const { accessToken, instrumentKey, interval, fromDate, toDate } = body;
+    if (!instrumentKey || !interval) {
+        return { status: false, message: 'Instrument key and interval required' };
+    }
+
+    try {
+        const url = `${UPSTOX_BASE}/historical-candle/${encodeURIComponent(instrumentKey)}/${interval}/${toDate}/${fromDate}`;
+        const headers = { Accept: 'application/json' };
+        if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+        const response = await fetch(url, { headers });
+        return await response.json();
+    } catch (error) {
+        return { status: false, message: error.message };
+    }
+}
+
+// Upstox OAuth callback handler
+function serveUpstoxCallback(req, res) {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const code = url.searchParams.get('code');
+    const html = `<!DOCTYPE html><html><head><title>Upstox Login</title></head><body style="background:#0a0e1a;color:#fff;font-family:Inter,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+    <div style="text-align:center;padding:40px;background:#111827;border-radius:16px;border:1px solid rgba(99,179,237,0.15)">
+        <h2 style="color:#4fd1c5">Upstox Login ${code ? 'Successful' : 'Failed'}</h2>
+        ${code ? `<p>Authorization Code:</p><input value="${code}" style="width:100%;padding:10px;background:#0a0e1a;border:1px solid #4fd1c5;color:#fff;border-radius:8px;font-size:14px;text-align:center" onclick="this.select()">
+        <p style="color:#6b7b8f;font-size:12px;margin-top:12px">Yeh code copy karke app mein paste karo ya yeh page band karo - auto-fill ho jayega.</p>
+        <script>if(window.opener){window.opener.postMessage({type:'upstox-code',code:'${code}'},'*');}</script>` : '<p style="color:#fc8181">Login failed or cancelled.</p>'}
+    </div></body></html>`;
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(html);
 }

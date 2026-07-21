@@ -276,19 +276,28 @@
     </div>
 
     <div class="config-panel" id="configPanel">
-        <h2>Angel One API <a href="https://smartapi.angelone.in/" target="_blank" style="font-size:12px;color:#63b3ed;font-weight:600;text-decoration:none;margin-left:10px;padding:4px 12px;background:rgba(99,179,237,0.1);border:1px solid rgba(99,179,237,0.2);border-radius:6px">📋 API Key Kaise Banaye?</a></h2>
-        <p style="font-size:12px;color:#6b7b8f;margin-bottom:12px">👉 <a href="https://smartapi.angelone.in/" target="_blank" style="color:#63b3ed;text-decoration:none">smartapi.angelone.in</a> pe jao → Sign up → App create karo → API Key milegi. Client ID = Angel One login ID. TOTP = Google Authenticator app se 6 digit code.</p>
+        <h2>Broker API <a href="https://smartapi.angelone.in/" target="_blank" style="font-size:12px;color:#63b3ed;font-weight:600;text-decoration:none;margin-left:10px;padding:4px 12px;background:rgba(99,179,237,0.1);border:1px solid rgba(99,179,237,0.2);border-radius:6px">📋 API Key Kaise Banaye?</a></h2>
+        <p style="font-size:12px;color:#6b7b8f;margin-bottom:12px">👉 <a href="https://smartapi.angelone.in/" target="_blank" style="color:#63b3ed;text-decoration:none">Angel One SmartAPI</a> ya <a href="https://upstox.com/developer/api-documentation/" target="_blank" style="color:#4fd1c5;text-decoration:none">Upstox API</a> pe jao → App create karo → API Key milegi.</p>
         <div class="config-form">
-            <div class="form-group"><label for="apiKey">API Key</label><input type="text" id="apiKey" placeholder="API key" autocomplete="off"></div>
-            <div class="form-group"><label for="apiSecret">Password</label><input type="password" id="apiSecret" placeholder="Password" autocomplete="off"></div>
-            <div class="form-group"><label for="clientId">Client ID</label><input type="text" id="clientId" placeholder="Client ID" autocomplete="off"></div>
-            <div class="form-group"><label for="totpSecret">TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP" autocomplete="one-time-code"></div>
+            <div class="form-group"><label for="brokerSelect">Broker</label><select id="brokerSelect" onchange="toggleBrokerFields()"><option value="angelone">Angel One</option><option value="upstox">Upstox</option></select></div>
+            <!-- Angel One Fields -->
+            <div class="form-group angelone-field"><label for="apiKey">API Key</label><input type="text" id="apiKey" placeholder="API key" autocomplete="off"></div>
+            <div class="form-group angelone-field"><label for="apiSecret">Password</label><input type="password" id="apiSecret" placeholder="Password" autocomplete="off"></div>
+            <div class="form-group angelone-field"><label for="clientId">Client ID</label><input type="text" id="clientId" placeholder="Client ID" autocomplete="off"></div>
+            <div class="form-group angelone-field"><label for="totpSecret">TOTP</label><input type="password" id="totpSecret" inputmode="numeric" maxlength="6" placeholder="6-digit TOTP" autocomplete="one-time-code"></div>
+            <!-- Upstox Fields -->
+            <div class="form-group upstox-field hidden"><label for="upstoxApiKey">API Key</label><input type="text" id="upstoxApiKey" placeholder="Upstox API Key" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxApiSecret">API Secret</label><input type="password" id="upstoxApiSecret" placeholder="Upstox API Secret" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxAccessToken">Access Token</label><input type="text" id="upstoxAccessToken" placeholder="Paste access token here" autocomplete="off"></div>
+            <div class="form-group upstox-field hidden"><label for="upstoxRedirectUri">Redirect URI</label><input type="text" id="upstoxRedirectUri" placeholder="https://your-url/callback" autocomplete="off"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
+                <button class="btn btn-small upstox-field hidden" onclick="upstoxLogin()" style="background:#4fd1c5;color:#000;font-weight:700">Upstox Login</button>
             </div>
         </div>
         <p class="helper-text" id="apiLoginError"></p>
+        <p class="helper-text upstox-field hidden" style="margin-top:8px;color:#4fd1c5">Upstox: "Upstox Login" pe click karo → Login karo → Token auto-fill ho jayega. Token next day 3:30 AM tak valid rehta hai.</p>
     </div>
 
     <main class="dashboard" id="dashboard" style="display:none">
@@ -540,7 +549,10 @@
     </main>
 </div>
 
-<script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}</script>
+<script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}
+function toggleBrokerFields(){var v=document.getElementById('brokerSelect').value;document.querySelectorAll('.angelone-field').forEach(function(el){el.classList.toggle('hidden',v!=='angelone')});document.querySelectorAll('.upstox-field').forEach(function(el){el.classList.toggle('hidden',v!=='upstox')});}
+function upstoxLogin(){var key=document.getElementById('upstoxApiKey').value.trim();var redirect=document.getElementById('upstoxRedirectUri').value.trim()||window.location.origin+'/callback';if(!key){alert('Upstox API Key daalo pehle');return;}var url='https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id='+encodeURIComponent(key)+'&redirect_uri='+encodeURIComponent(redirect);window.open(url,'_blank');}
+</script>
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
 <script src="js/technical-indicators.js"></script>
