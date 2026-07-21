@@ -1564,6 +1564,9 @@ function hasRecentMarketQuote(symbol, maxAgeMs = 15000) {
 }
 
 async function updateIndicators() {
+    // Skip Angel One indicators when other broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
+    
     if (isDemoMode) {
         seedDemoIndicators();
         refreshDisplayedIndicators();
@@ -2759,6 +2762,8 @@ function getCurrentScanner() {
 }
 
 async function populateExpirySelector() {
+    // Skip when non-Angel broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return '';
     const expirySelector = document.getElementById('expirySelector');
     if (!expirySelector) return '';
 
@@ -2852,6 +2857,8 @@ function setManualExpiry() {
 }
 
 async function loadOptionsChain(resetExpiry = false) {
+    // Skip Angel One option chain when other broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
     if (resetExpiry) await populateExpirySelector();
     await refreshOptionsForSelectedExpiry();
 }
@@ -4438,6 +4445,8 @@ function toggleOptionAutoRefresh() {
 
 function startOptionAutoRefresh() {
     if (optionDataInterval) clearInterval(optionDataInterval);
+    // Skip Angel One auto refresh when other broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
     const enabled = document.getElementById('autoRefreshToggle')?.checked;
     if (!enabled) return;
 
@@ -4490,6 +4499,8 @@ function toggleMarketWideScan() {
 }
 
 async function runMarketWideScan(force = false) {
+    // Skip Angel One scanner when other broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
     if (!force && (!autoScanState.enabled || autoScanState.running)) return;
     if (autoScanState.running) {
         // Safety: if scan has been stuck for >3 minutes, force reset
