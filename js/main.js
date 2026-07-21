@@ -800,79 +800,83 @@ function updateLastUpdateTime() {
 }
 
 function updateMarketBreadth() {
-    // Count how many indices are up vs down
-    let indexUp = 0;
-    let indexDown = 0;
-    let stockUp = 0;
-    let stockDown = 0;
+    // NSE Indices count
+    let nseIndexUp = 0, nseIndexDown = 0;
+    // BSE Indices count
+    let bseIndexUp = 0, bseIndexDown = 0;
+    // NSE Stocks count
+    let nseStockUp = 0, nseStockDown = 0;
+    // BSE Stocks count
+    let bseStockUp = 0, bseStockDown = 0;
 
+    // Count indices from latestChangeBySymbol
     Object.entries(latestChangeBySymbol).forEach(([symbol, changeInfo]) => {
         if (!changeInfo) return;
         const points = Number(changeInfo.points || 0);
+        if (!points) return;
+
         if (indexUiMap[symbol]) {
-            if (points > 0) indexUp++;
-            else if (points < 0) indexDown++;
+            const exchange = Config.indexExchanges[symbol] || 'NSE';
+            if (exchange === 'BSE') {
+                if (points > 0) bseIndexUp++; else bseIndexDown++;
+            } else {
+                if (points > 0) nseIndexUp++; else nseIndexDown++;
+            }
         }
     });
 
-    // For stocks: count from scan results (signal cards in auto scanner)
-    const scanResults = document.querySelectorAll('#marketScanResults .signal-card');
-    scanResults.forEach(card => {
-        const text = card.textContent || '';
-        if (/BUY\s*(CALL)?|BTST\s*(CALL)?|SWING\s*(CALL)?/i.test(text)) stockUp++;
-        else if (/BUY\s*PUT|BTST\s*PUT|SWING\s*PUT/i.test(text)) stockDown++;
-    });
-
-    // Also count from resolved stocks that have live price data
+    // Count stocks from resolved scanner stocks
     if (autoScanState.resolvedStocks && autoScanState.resolvedStocks.length) {
-        let resolvedUp = 0;
-        let resolvedDown = 0;
         autoScanState.resolvedStocks.forEach(stock => {
             const change = latestChangeBySymbol[stock.symbol];
-            if (change) {
-                if (Number(change.points || 0) > 0) resolvedUp++;
-                else if (Number(change.points || 0) < 0) resolvedDown++;
+            if (!change) return;
+            const points = Number(change.points || 0);
+            if (!points) return;
+            const exchange = String(stock.exchange || 'NSE').toUpperCase();
+            if (exchange === 'BSE') {
+                if (points > 0) bseStockUp++; else bseStockDown++;
+            } else {
+                if (points > 0) nseStockUp++; else nseStockDown++;
             }
         });
-        // Use resolved stocks if we have data and no scan signal cards
-        if ((resolvedUp || resolvedDown) && !stockUp && !stockDown) {
-            stockUp = resolvedUp;
-            stockDown = resolvedDown;
-        }
     }
 
-    // Fallback: count from active trades
-    if (!stockUp && !stockDown) {
-        const history = getOptionTradeHistory ? getOptionTradeHistory() : [];
-        history.forEach(trade => {
-            if (trade.status !== 'open') return;
-            const pnl = Number(trade.pnl || 0);
-            if (pnl > 0) stockUp++;
-            else if (pnl < 0) stockDown++;
+    // Count from scan signal cards as fallback for stocks
+    if (!nseStockUp && !nseStockDown) {
+        const scanResults = document.querySelectorAll('#marketScanResults .signal-card');
+        scanResults.forEach(card => {
+            const text = card.textContent || '';
+            if (/BUY\s*(CALL)?|BTST\s*(CALL)?|SWING\s*(CALL)?/i.test(text)) nseStockUp++;
+            else if (/BUY\s*PUT|BTST\s*PUT|SWING\s*PUT/i.test(text)) nseStockDown++;
         });
     }
 
-    // Update UI
-    const indexUpEl = document.getElementById('breadthIndexUp');
-    const indexDownEl = document.getElementById('breadthIndexDown');
-    const indexBarEl = document.getElementById('breadthIndexBar');
-    const stockUpEl = document.getElementById('breadthStockUp');
-    const stockDownEl = document.getElementById('breadthStockDown');
-    const stockBarEl = document.getElementById('breadthStockBar');
+    // Update NSE Indices UI
+    const nseTotal = nseIndexUp + nseIndexDown;
+    updateBreadthCard('breadthIndexUp', 'breadthIndexDown', 'breadthIndexBar', 'breadthIndexTotal', nseIndexUp, nseIndexDown, nseTotal);
 
-    if (indexUpEl) indexUpEl.textContent = indexUp;
-    if (indexDownEl) indexDownEl.textContent = indexDown;
-    if (indexBarEl) {
-        const total = indexUp + indexDown;
-        indexBarEl.style.width = total > 0 ? `${(indexUp / total) * 100}%` : '50%';
-    }
+    // Update BSE Indices UI
+    const bseTotal = bseIndexUp + bseIndexDown;
+    updateBreadthCard('breadthBseUp', 'breadthBseDown', 'breadthBseBar', 'breadthBseTotal', bseIndexUp, bseIndexDown, bseTotal);
 
-    if (stockUpEl) stockUpEl.textContent = stockUp;
-    if (stockDownEl) stockDownEl.textContent = stockDown;
-    if (stockBarEl) {
-        const total = stockUp + stockDown;
-        stockBarEl.style.width = total > 0 ? `${(stockUp / total) * 100}%` : '50%';
-    }
+    // Update NSE Stocks UI
+    const nseStockTotal = nseStockUp + nseStockDown;
+    updateBreadthCard('breadthStockUp', 'breadthStockDown', 'breadthStockBar', 'breadthStockTotal', nseStockUp, nseStockDown, nseStockTotal);
+
+    // Update BSE Stocks UI
+    const bseStockTotal = bseStockUp + bseStockDown;
+    updateBreadthCard('breadthBseStockUp', 'breadthBseStockDown', 'breadthBseStockBar', 'breadthBseStockTotal', bseStockUp, bseStockDown, bseStockTotal);
+}
+
+function updateBreadthCard(upId, downId, barId, totalId, up, down, total) {
+    const upEl = document.getElementById(upId);
+    const downEl = document.getElementById(downId);
+    const barEl = document.getElementById(barId);
+    const totalEl = document.getElementById(totalId);
+    if (upEl) upEl.textContent = up;
+    if (downEl) downEl.textContent = down;
+    if (barEl) barEl.style.width = total > 0 ? `${(up / total) * 100}%` : '50%';
+    if (totalEl) totalEl.textContent = `(${total})`;
 }
 
 function hasRecentMarketQuote(symbol, maxAgeMs = 15000) {
