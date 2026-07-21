@@ -289,10 +289,17 @@ async function connectUpstox() {
         });
         const data = await response.json();
 
-        if (data.status === 'error' || data.errors) {
+        if (data.status === 'error' || (data.errors && data.errors.length)) {
             const errMsg = data.errors?.[0]?.message || data.message || 'Upstox token invalid or expired. Naya token generate karo.';
             setStatus('Upstox failed', false);
             if (loginError) loginError.textContent = errMsg;
+            return;
+        }
+
+        // Check if data has quotes
+        if (!data.data || !Object.keys(data.data).length) {
+            setStatus('Upstox failed', false);
+            if (loginError) loginError.textContent = 'Upstox returned no data. Token check karo.';
             return;
         }
 
@@ -309,12 +316,63 @@ async function connectUpstox() {
         // Start Upstox market data polling
         stopMarketDataUpdates();
         fetchUpstoxMarketData();
-        marketDataInterval = setInterval(fetchUpstoxMarketData, 5000);
+        marketDataInterval = setInterval(fetchUpstoxMarketData, 4000);
+
+        // Also fetch historical for indicators
+        updateUpstoxIndicators();
+        updateInterval = setInterval(updateUpstoxIndicators, 180000);
+
         AngelOneAPI.log('Connected to Upstox API. Live market data active.');
     } catch (error) {
         setStatus('Upstox connection failed', false);
         if (loginError) loginError.textContent = 'Network error: ' + error.message;
     }
+}
+
+async function updateUpstoxIndicators() {
+    if (!window._upstoxToken) return;
+    
+    const symbols = ['NSE_INDEX|Nifty 50', 'NSE_INDEX|Nifty Bank'];
+    const symbolMap = { 'NSE_INDEX|Nifty 50': 'NIFTY', 'NSE_INDEX|Nifty Bank': 'BANKNIFTY' };
+    
+    for (const instrumentKey of symbols) {
+        try {
+            const toDate = new Date().toISOString().split('T')[0];
+            const fromDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            
+            const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/historical`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accessToken: window._upstoxToken,
+                    instrumentKey,
+                    interval: '5minute',
+                    fromDate,
+                    toDate
+                })
+            });
+            const data = await response.json();
+            
+            if (data.status === 'success' && data.data?.candles?.length) {
+                const candles = data.data.candles.reverse(); // Upstox returns newest first
+                const opens = candles.map(c => c[1]);
+                const highs = candles.map(c => c[2]);
+                const lows = candles.map(c => c[3]);
+                const closes = candles.map(c => c[4]);
+                const volumes = candles.map(c => c[5]);
+                
+                const symbol = symbolMap[instrumentKey];
+                latestIndicatorsBySymbol[symbol] = computeAllIndicators(opens, highs, lows, closes, volumes);
+                latestIndicatorTimesBySymbol[symbol] = Date.now();
+            }
+            
+            await new Promise(r => setTimeout(r, 1500));
+        } catch (e) {
+            AngelOneAPI.log(`Upstox indicator error: ${e.message}`);
+        }
+    }
+    
+    refreshDisplayedIndicators();
 }
 
 async function fetchUpstoxMarketData() {

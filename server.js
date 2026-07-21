@@ -320,6 +320,12 @@ async function handleApi(req, res) {
         return;
     }
 
+    if (req.url === '/api/upstox/option-chain') {
+        const data = await getUpstoxOptionChain(body);
+        sendJson(res, 200, data);
+        return;
+    }
+
     if (req.url === '/api/credentials/save') {
         const creds = {
             apiKey: body.apiKey || '',
@@ -2532,7 +2538,7 @@ async function getUpstoxToken(body) {
 async function getUpstoxMarketData(body) {
     const { accessToken, instruments } = body;
     if (!accessToken || !instruments) {
-        return { status: false, message: 'Access token and instruments required' };
+        return { status: 'error', message: 'Access token and instruments required' };
     }
 
     try {
@@ -2541,18 +2547,27 @@ async function getUpstoxMarketData(body) {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 Accept: 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(15000)
         });
-        return await response.json();
+        const result = await response.json();
+        
+        // Log for debugging
+        if (result.status === 'error') {
+            console.log(`Upstox market-data error: ${JSON.stringify(result.errors || result.message || '')}`);
+        }
+        
+        return result;
     } catch (error) {
-        return { status: false, message: error.message };
+        console.log(`Upstox market-data fetch error: ${error.message}`);
+        return { status: 'error', message: error.message };
     }
 }
 
 async function getUpstoxHistorical(body) {
     const { accessToken, instrumentKey, interval, fromDate, toDate } = body;
     if (!instrumentKey || !interval) {
-        return { status: false, message: 'Instrument key and interval required' };
+        return { status: 'error', message: 'Instrument key and interval required' };
     }
 
     try {
@@ -2560,10 +2575,33 @@ async function getUpstoxHistorical(body) {
         const headers = { Accept: 'application/json' };
         if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-        const response = await fetch(url, { headers });
+        const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
         return await response.json();
     } catch (error) {
-        return { status: false, message: error.message };
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function getUpstoxOptionChain(body) {
+    const { accessToken, instrumentKey, expiryDate } = body;
+    if (!accessToken || !instrumentKey) {
+        return { status: 'error', message: 'Access token and instrument key required' };
+    }
+
+    try {
+        let url = `${UPSTOX_BASE}/option/chain?instrument_key=${encodeURIComponent(instrumentKey)}`;
+        if (expiryDate) url += `&expiry_date=${expiryDate}`;
+
+        const response = await fetch(url, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: 'application/json'
+            },
+            signal: AbortSignal.timeout(20000)
+        });
+        return await response.json();
+    } catch (error) {
+        return { status: 'error', message: error.message };
     }
 }
 
