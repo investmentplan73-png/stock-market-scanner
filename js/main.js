@@ -245,6 +245,11 @@ async function connectAPI() {
 
     isDemoMode = false;
     window._activeBroker = 'angelone';
+    
+    // Reset state from other brokers
+    window._upstoxToken = null;
+    window._dhanToken = null;
+    
     Config.apiKey = apiKey;
     Config.apiSecret = apiSecret;
     Config.clientId = clientId;
@@ -306,6 +311,9 @@ async function connectUpstox() {
             if (loginError) loginError.textContent = 'Upstox returned no data. Token check karo.';
             return;
         }
+
+        // RESET everything before connecting new broker
+        resetBrokerState();
 
         // Connected! Store token
         isDemoMode = false;
@@ -610,6 +618,57 @@ async function fetchUpstoxMarketData() {
 
 // ==================== DHAN API INTEGRATION ====================
 
+// Reset all broker state when switching brokers
+function resetBrokerState() {
+    // Stop all running intervals
+    stopMarketDataUpdates();
+    
+    // Clear old broker tokens
+    window._upstoxToken = null;
+    window._dhanToken = null;
+    window._dhanClientId = null;
+    window._activeBroker = null;
+    
+    // Clear price data
+    Object.keys(latestPricesBySymbol).forEach(k => delete latestPricesBySymbol[k]);
+    Object.keys(latestChangeBySymbol).forEach(k => delete latestChangeBySymbol[k]);
+    Object.keys(latestIndicatorsBySymbol).forEach(k => delete latestIndicatorsBySymbol[k]);
+    Object.keys(latestIndicatorTimesBySymbol).forEach(k => delete latestIndicatorTimesBySymbol[k]);
+    
+    // Clear active signals (old broker's calls)
+    const signalsContainer = document.getElementById('signalsContainer');
+    if (signalsContainer) signalsContainer.innerHTML = '<div class="no-signals">Waiting for signals...</div>';
+    
+    // Clear scan results
+    const scanResults = document.getElementById('marketScanResults');
+    if (scanResults) scanResults.innerHTML = '<div class="no-signals">Scanner starting...</div>';
+    
+    // Reset index price display
+    const indices = ['nifty', 'banknifty', 'sensex', 'bankex', 'finnifty', 'midcpnifty', 'indiavix'];
+    indices.forEach(idx => {
+        const priceEl = document.getElementById(`${idx}Price`);
+        const changeEl = document.getElementById(`${idx}Change`);
+        if (priceEl) priceEl.textContent = '--';
+        if (changeEl) { changeEl.textContent = '--'; changeEl.className = 'change'; }
+    });
+    
+    // Reset option summary
+    const optionSummary = document.getElementById('optionSummary');
+    if (optionSummary) optionSummary.innerHTML = '<div class="summary-title">Connecting to broker...</div>';
+    
+    // Clear signal log (keep system initialized)
+    const logContainer = document.getElementById('logContainer');
+    if (logContainer) logContainer.innerHTML = '<div class="log-entry">Broker switched. Connecting...</div>';
+    
+    // Reset scan status
+    updateText('marketScanStatus', 'Starting...');
+    updateText('marketScanLastRun', '--');
+    updateText('marketScanCount', '--');
+    
+    AngelOneAPI.isConnected = false;
+    liveDataFailureCount = 0;
+}
+
 async function connectDhan() {
     const accessToken = document.getElementById('dhanAccessToken')?.value.trim() || '';
     const clientId = document.getElementById('dhanClientId')?.value.trim() || '';
@@ -644,6 +703,9 @@ async function connectDhan() {
             if (loginError) loginError.textContent = errMsg;
             return;
         }
+
+        // RESET everything before connecting new broker
+        resetBrokerState();
 
         // Connected
         isDemoMode = false;
