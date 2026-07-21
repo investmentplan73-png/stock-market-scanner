@@ -214,12 +214,18 @@ function checkExistingConnection() {
 }
 
 async function connectAPI() {
+    const broker = document.getElementById('brokerSelect')?.value || 'angelone';
+
+    if (broker === 'upstox') {
+        return connectUpstox();
+    }
+
     const apiKey = document.getElementById('apiKey').value.trim();
     const apiSecret = document.getElementById('apiSecret').value.trim();
     const clientId = document.getElementById('clientId').value.trim();
     const totpSecret = document.getElementById('totpSecret').value.trim();
     const publicIp = document.getElementById('publicIp')?.value.trim() || '';
-    const loginError = document.getElementById('loginError');
+    const loginError = document.getElementById('apiLoginError');
     if (loginError) loginError.textContent = '';
 
     if (!apiKey || !apiSecret || !clientId) {
@@ -253,8 +259,62 @@ async function connectAPI() {
     } else {
         setStatus('Connection failed', false);
         if (loginError) {
-            loginError.textContent = AngelOneAPI.lastError || 'Connection failed. Check password, 6-digit TOTP, API key, client ID, and Primary Static IP.';
+            loginError.textContent = AngelOneAPI.lastError || 'Connection failed. Check password, 6-digit TOTP, API key, client ID.';
         }
+    }
+}
+
+async function connectUpstox() {
+    const accessToken = document.getElementById('upstoxAccessToken')?.value.trim() || '';
+    const apiKey = document.getElementById('upstoxApiKey')?.value.trim() || '';
+    const loginError = document.getElementById('apiLoginError');
+    if (loginError) loginError.textContent = '';
+
+    if (!accessToken) {
+        if (loginError) loginError.textContent = 'Access Token required. Click "Upstox Login" to get token, then paste it.';
+        alert('Upstox Access Token daalo. Pehle "Upstox Login" pe click karo, login karo, token copy karke paste karo.');
+        return;
+    }
+
+    setStatus('Connecting Upstox...', false);
+
+    // Test the token by fetching a market quote
+    try {
+        const response = await fetch(`${Config.endpoints.proxyBase}/api/upstox/market-data`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accessToken,
+                instruments: 'NSE_INDEX|Nifty 50'
+            })
+        });
+        const data = await response.json();
+
+        if (data.status === 'error' || data.errors) {
+            const errMsg = data.errors?.[0]?.message || data.message || 'Upstox token invalid or expired';
+            setStatus('Upstox connection failed', false);
+            if (loginError) loginError.textContent = errMsg;
+            return;
+        }
+
+        // Store Upstox config
+        isDemoMode = false;
+        Config.apiKey = apiKey;
+        Config.accessToken = accessToken;
+        Config.clientId = 'UPSTOX';
+        window._upstoxToken = accessToken;
+        window._activeBroker = 'upstox';
+        Config.saveConfig();
+
+        liveDataFailureCount = 0;
+        AngelOneAPI.isConnected = true;
+        setStatus('Connected (Upstox)', true);
+        showDashboard();
+        startMarketDataUpdates();
+        AngelOneAPI.log('Connected to Upstox API successfully.');
+    } catch (error) {
+        setStatus('Upstox connection failed', false);
+        if (loginError) loginError.textContent = 'Network error: ' + error.message;
     }
 }
 
