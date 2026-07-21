@@ -326,6 +326,25 @@ async function handleApi(req, res) {
         return;
     }
 
+    // ==================== DHAN API PROXY ====================
+    if (req.url === '/api/dhan/market-quote') {
+        const data = await getDhanMarketQuote(body);
+        sendJson(res, 200, data);
+        return;
+    }
+
+    if (req.url === '/api/dhan/historical') {
+        const data = await getDhanHistorical(body);
+        sendJson(res, 200, data);
+        return;
+    }
+
+    if (req.url === '/api/dhan/option-chain') {
+        const data = await getDhanOptionChain(body);
+        sendJson(res, 200, data);
+        return;
+    }
+
     if (req.url === '/api/credentials/save') {
         const creds = {
             apiKey: body.apiKey || '',
@@ -2618,4 +2637,107 @@ function serveUpstoxCallback(req, res) {
     </div></body></html>`;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(html);
+}
+
+// ==================== DHAN API FUNCTIONS ====================
+
+const DHAN_BASE = 'https://api.dhan.co/v2';
+
+// Dhan security IDs for major indices
+const DHAN_INDEX_IDS = {
+    NIFTY: '13',
+    BANKNIFTY: '25',
+    FINNIFTY: '27',
+    MIDCPNIFTY: '442',
+    SENSEX: '51',
+    BANKEX: '52'
+};
+
+async function getDhanMarketQuote(body) {
+    const { accessToken, clientId, securityIds, exchangeSegment } = body;
+    if (!accessToken || !securityIds) {
+        return { status: 'error', message: 'Access token and securityIds required' };
+    }
+
+    try {
+        const ids = Array.isArray(securityIds) ? securityIds : [securityIds];
+        const segment = exchangeSegment || 'IDX_I';
+        const payload = {};
+        payload[segment] = ids.map(String);
+
+        const response = await fetch(`${DHAN_BASE}/marketfeed/quote`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'access-token': accessToken,
+                'client-id': clientId || ''
+            },
+            body: JSON.stringify(payload),
+            signal: AbortSignal.timeout(15000)
+        });
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.log(`Dhan market-quote error: ${error.message}`);
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function getDhanHistorical(body) {
+    const { accessToken, clientId, securityId, exchangeSegment, instrument, fromDate, toDate, interval } = body;
+    if (!accessToken || !securityId) {
+        return { status: 'error', message: 'Access token and securityId required' };
+    }
+
+    try {
+        const response = await fetch(`${DHAN_BASE}/charts/historical`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'access-token': accessToken,
+                'client-id': clientId || ''
+            },
+            body: JSON.stringify({
+                securityId: String(securityId),
+                exchangeSegment: exchangeSegment || 'IDX_I',
+                instrument: instrument || 'INDEX',
+                fromDate: fromDate || '',
+                toDate: toDate || '',
+                expiryCode: 0,
+                interval: interval || '5'
+            }),
+            signal: AbortSignal.timeout(20000)
+        });
+        return await response.json();
+    } catch (error) {
+        console.log(`Dhan historical error: ${error.message}`);
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function getDhanOptionChain(body) {
+    const { accessToken, clientId, underlyingSecurityId, underlyingValue, expiryDate } = body;
+    if (!accessToken || !underlyingSecurityId) {
+        return { status: 'error', message: 'Access token and underlyingSecurityId required' };
+    }
+
+    try {
+        const params = new URLSearchParams();
+        params.append('UnderlyingScrip', String(underlyingSecurityId));
+        if (expiryDate) params.append('ExpiryDate', expiryDate);
+
+        const response = await fetch(`${DHAN_BASE}/optionchain?${params.toString()}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'access-token': accessToken,
+                'client-id': clientId || ''
+            },
+            signal: AbortSignal.timeout(20000)
+        });
+        return await response.json();
+    } catch (error) {
+        console.log(`Dhan option-chain error: ${error.message}`);
+        return { status: 'error', message: error.message };
+    }
 }

@@ -219,6 +219,9 @@ async function connectAPI() {
     if (broker === 'upstox') {
         return connectUpstox();
     }
+    if (broker === 'dhan') {
+        return connectDhan();
+    }
 
     const apiKey = document.getElementById('apiKey').value.trim();
     const apiSecret = document.getElementById('apiSecret').value.trim();
@@ -601,6 +604,299 @@ async function fetchUpstoxMarketData() {
         }
     } catch (error) {
         markLiveDataUnavailable('Upstox: ' + error.message, 'ltp');
+    }
+}
+
+// ==================== DHAN API INTEGRATION ====================
+
+async function connectDhan() {
+    const accessToken = document.getElementById('dhanAccessToken')?.value.trim() || '';
+    const clientId = document.getElementById('dhanClientId')?.value.trim() || '';
+    const loginError = document.getElementById('apiLoginError');
+    if (loginError) loginError.textContent = '';
+
+    if (!accessToken || !clientId) {
+        if (loginError) loginError.textContent = 'Dhan Client ID aur Access Token dono required hain.';
+        alert('Dhan Client ID aur Access Token daalo.');
+        return;
+    }
+
+    setStatus('Connecting Dhan...', false);
+
+    // Test token by fetching NIFTY quote
+    try {
+        const response = await fetch(`${Config.endpoints.proxyBase}/api/dhan/market-quote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accessToken,
+                clientId,
+                securityIds: ['13'],
+                exchangeSegment: 'IDX_I'
+            })
+        });
+        const data = await response.json();
+
+        if (data.status === 'error' || data.errorCode || data.errorType) {
+            const errMsg = data.errorMessage || data.message || 'Dhan token invalid. Check Client ID aur Access Token.';
+            setStatus('Dhan failed', false);
+            if (loginError) loginError.textContent = errMsg;
+            return;
+        }
+
+        // Connected
+        isDemoMode = false;
+        window._dhanToken = accessToken;
+        window._dhanClientId = clientId;
+        window._activeBroker = 'dhan';
+        AngelOneAPI.isConnected = true;
+
+        liveDataFailureCount = 0;
+        setStatus('Connected (Dhan)', true);
+        showDashboard();
+
+        // Start Dhan market data polling
+        stopMarketDataUpdates();
+        fetchDhanMarketData();
+        marketDataInterval = setInterval(fetchDhanMarketData, 4000);
+
+        // Indicators + Option scan
+        setTimeout(updateDhanIndicators, 5000);
+        updateInterval = setInterval(updateDhanIndicators, 120000);
+        setTimeout(runDhanOptionScan, 15000);
+        setInterval(runDhanOptionScan, 60000);
+
+        AngelOneAPI.log('Connected to Dhan API. Live market data active.');
+    } catch (error) {
+        setStatus('Dhan connection failed', false);
+        if (loginError) loginError.textContent = 'Network error: ' + error.message;
+    }
+}
+
+async function fetchDhanMarketData() {
+    if (!window._dhanToken) return;
+
+    try {
+        // Fetch index quotes (IDX_I segment)
+        const response = await fetch(`${Config.endpoints.proxyBase}/api/dhan/market-quote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                accessToken: window._dhanToken,
+                clientId: window._dhanClientId,
+                securityIds: ['13', '25', '27', '442', '51', '52'],
+                exchangeSegment: 'IDX_I'
+            })
+        });
+        const data = await response.json();
+
+        if (data.status === 'error' || data.errorCode) {
+            markLiveDataUnavailable(data.errorMessage || 'Dhan data error', 'ltp');
+            return;
+        }
+
+        const dhanIdToSymbol = {
+            '13': 'NIFTY', '25': 'BANKNIFTY', '27': 'FINNIFTY',
+            '442': 'MIDCPNIFTY', '51': 'SENSEX', '52': 'BANKEX'
+        };
+
+        let updatedCount = 0;
+        const quoteData = data.data || data;
+
+        // Dhan returns { data: { "13": { ltp, open, high, low, close, ... }, ... } }
+        Object.entries(quoteData).forEach(([id, quote]) => {
+            if (!quote || typeof quote !== 'object') return;
+            const symbol = dhanIdToSymbol[id];
+            if (!symbol) return;
+
+            const ltp = Number(quote.LTP || quote.ltp || quote.last_price || 0);
+            const prevClose = Number(quote.close || quote.prev_close || 0);
+            const change = prevClose > 0 ? ltp - prevClose : 0;
+            const changePercent = prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : 0;
+
+            if (ltp > 0) {
+                latestPricesBySymbol[symbol] = ltp;
+                latestChangeBySymbol[symbol] = { points: change, percent: changePercent };
+                updatedCount++;
+
+                const prefix = symbol.toLowerCase();
+                const priceEl = document.getElementById(`${prefix}Price`);
+                const changeEl = document.getElementById(`${prefix}Change`);
+                if (priceEl) priceEl.textContent = ltp.toFixed(2);
+                if (changeEl) {
+                    changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(2)}%)`;
+                    changeEl.className = `change ${change >= 0 ? 'positive' : 'negative'}`;
+                }
+            }
+        });
+
+        if (updatedCount > 0) {
+            liveDataFailureCount = 0;
+            setStatus('Connected (Dhan)', true);
+            updateLastUpdateTime();
+            updateMarketBreadth();
+        } else {
+            markLiveDataUnavailable('Dhan returned no index data', 'ltp');
+        }
+    } catch (error) {
+        markLiveDataUnavailable('Dhan: ' + error.message, 'ltp');
+    }
+}
+
+async function updateDhanIndicators() {
+    if (!window._dhanToken) return;
+
+    const targets = [
+        { symbol: 'NIFTY', securityId: '13' },
+        { symbol: 'BANKNIFTY', securityId: '25' }
+    ];
+
+    for (const target of targets) {
+        try {
+            const toDate = new Date().toISOString().split('T')[0];
+            const fromDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+            const response = await fetch(`${Config.endpoints.proxyBase}/api/dhan/historical`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accessToken: window._dhanToken,
+                    clientId: window._dhanClientId,
+                    securityId: target.securityId,
+                    exchangeSegment: 'IDX_I',
+                    instrument: 'INDEX',
+                    fromDate,
+                    toDate,
+                    interval: '5'
+                })
+            });
+            const data = await response.json();
+
+            // Dhan returns { open: [...], high: [...], low: [...], close: [...], volume: [...], timestamp: [...] }
+            if (data.open && data.close && data.open.length > 10) {
+                latestIndicatorsBySymbol[target.symbol] = computeAllIndicators(
+                    data.open, data.high, data.low, data.close, data.volume || []
+                );
+                latestIndicatorTimesBySymbol[target.symbol] = Date.now();
+            }
+
+            await new Promise(r => setTimeout(r, 2000));
+        } catch (e) {
+            AngelOneAPI.log(`Dhan indicator error (${target.symbol}): ${e.message}`);
+        }
+    }
+
+    refreshDisplayedIndicators();
+}
+
+// ==================== DHAN OPTION CHAIN SCANNER ====================
+let dhanScanRunning = false;
+
+async function runDhanOptionScan() {
+    if (!window._dhanToken || dhanScanRunning) return;
+    dhanScanRunning = true;
+
+    const scanTargets = [
+        { symbol: 'NIFTY', securityId: '13' },
+        { symbol: 'BANKNIFTY', securityId: '25' }
+    ];
+
+    updateText('marketScanStatus', 'Scanning (Dhan)...');
+
+    try {
+        for (const target of scanTargets) {
+            const spot = latestPricesBySymbol[target.symbol];
+            if (!spot) continue;
+
+            const response = await fetch(`${Config.endpoints.proxyBase}/api/dhan/option-chain`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    accessToken: window._dhanToken,
+                    clientId: window._dhanClientId,
+                    underlyingSecurityId: target.securityId
+                })
+            });
+            const chainData = await response.json();
+
+            if (chainData.errorCode || !chainData.data) {
+                AngelOneAPI.log(`Dhan option chain error (${target.symbol}): ${chainData.errorMessage || 'No data'}`);
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+            }
+
+            // Parse Dhan option chain into our format
+            const calls = {};
+            const puts = {};
+            const strikeStep = target.symbol === 'NIFTY' ? 50 : 100;
+            const atmStrike = Math.round(spot / strikeStep) * strikeStep;
+
+            const chainRows = Array.isArray(chainData.data) ? chainData.data : [];
+            chainRows.forEach(row => {
+                const strike = Number(row.strikePrice || row.strike_price || 0);
+                if (!strike || Math.abs(strike - atmStrike) > strikeStep * 5) return;
+
+                if (row.ce || row.call) {
+                    const ce = row.ce || row.call || {};
+                    calls[strike] = {
+                        ltp: Number(ce.ltp || ce.LTP || 0),
+                        change: Number(ce.change || ce.netChange || 0),
+                        volume: Number(ce.volume || ce.tradedVolume || 0),
+                        oi: Number(ce.oi || ce.openInterest || 0),
+                        iv: Number(ce.iv || ce.impliedVolatility || 0),
+                        delta: Number(ce.delta || 0),
+                        token: String(ce.securityId || ce.security_id || ''),
+                        lotSize: Number(ce.lotSize || ce.lot_size || 0)
+                    };
+                }
+                if (row.pe || row.put) {
+                    const pe = row.pe || row.put || {};
+                    puts[strike] = {
+                        ltp: Number(pe.ltp || pe.LTP || 0),
+                        change: Number(pe.change || pe.netChange || 0),
+                        volume: Number(pe.volume || pe.tradedVolume || 0),
+                        oi: Number(pe.oi || pe.openInterest || 0),
+                        iv: Number(pe.iv || pe.impliedVolatility || 0),
+                        delta: Number(pe.delta || 0),
+                        token: String(pe.securityId || pe.security_id || ''),
+                        lotSize: Number(pe.lotSize || pe.lot_size || 0)
+                    };
+                }
+            });
+
+            if (!Object.keys(calls).length && !Object.keys(puts).length) {
+                await new Promise(r => setTimeout(r, 3000));
+                continue;
+            }
+
+            // Use existing signal engine
+            const indicators = latestIndicatorsBySymbol[target.symbol] || {};
+            const chainForEngine = { spotPrice: spot, calls, puts, expiryDate: '' };
+            const evaluation = OptionSignalEngine.evaluateChain(target.symbol, chainForEngine, indicators, spot, { timeframe: 'FIVE_MINUTE' });
+
+            if (evaluation.best && isTradeAlertAction(evaluation.best.action)) {
+                evaluation.best.source = 'Dhan Scan';
+                evaluation.best.segment = 'INDEX';
+                addActiveOptionSignal(evaluation.best);
+                AngelOneAPI.log(`Dhan signal: ${evaluation.best.action} ${target.symbol} ${evaluation.best.strike} ${evaluation.best.side} score ${evaluation.best.score}%`);
+                TelegramNotifier.sendOptionSignal(evaluation.best);
+                registerOptionTrade(evaluation.best, {});
+            } else if (evaluation.best) {
+                evaluation.best.source = 'Dhan Scan';
+                addActiveOptionSignal(evaluation.best);
+            }
+
+            renderOptionSummary(evaluation);
+            await new Promise(r => setTimeout(r, 4000));
+        }
+
+        updateText('marketScanStatus', 'Scan complete (Dhan)');
+        updateText('marketScanLastRun', new Date().toLocaleTimeString());
+    } catch (error) {
+        AngelOneAPI.log(`Dhan scan error: ${error.message}`);
+        updateText('marketScanStatus', 'Scan error');
+    } finally {
+        dhanScanRunning = false;
     }
 }
 

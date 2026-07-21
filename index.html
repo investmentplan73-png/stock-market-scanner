@@ -279,7 +279,7 @@
         <h2>Broker API <a href="https://smartapi.angelone.in/" target="_blank" style="font-size:12px;color:#63b3ed;font-weight:600;text-decoration:none;margin-left:10px;padding:4px 12px;background:rgba(99,179,237,0.1);border:1px solid rgba(99,179,237,0.2);border-radius:6px">📋 API Key Kaise Banaye?</a></h2>
         <p style="font-size:12px;color:#6b7b8f;margin-bottom:12px">👉 <a href="https://smartapi.angelone.in/" target="_blank" style="color:#63b3ed;text-decoration:none">Angel One SmartAPI</a> ya <a href="https://upstox.com/developer/api-documentation/" target="_blank" style="color:#4fd1c5;text-decoration:none">Upstox API</a> pe jao → App create karo → API Key milegi.</p>
         <div class="config-form">
-            <div class="form-group"><label for="brokerSelect">Broker</label><select id="brokerSelect" onchange="toggleBrokerFields()"><option value="angelone">Angel One</option><option value="upstox">Upstox</option></select></div>
+            <div class="form-group"><label for="brokerSelect">Broker</label><select id="brokerSelect" onchange="toggleBrokerFields()"><option value="angelone">Angel One</option><option value="dhan">Dhan</option><option value="upstox">Upstox</option></select></div>
             <!-- Angel One Fields -->
             <div class="form-group angelone-field"><label for="apiKey">API Key</label><input type="text" id="apiKey" placeholder="API key" autocomplete="off"></div>
             <div class="form-group angelone-field"><label for="apiSecret">MPIN</label><input type="password" id="apiSecret" placeholder="Angel One MPIN" autocomplete="off"></div>
@@ -289,6 +289,9 @@
             <div class="form-group upstox-field hidden"><label for="upstoxApiKey">API Key</label><input type="text" id="upstoxApiKey" placeholder="Upstox API Key" autocomplete="off"></div>
             <div class="form-group upstox-field hidden"><label for="upstoxApiSecret">API Secret</label><input type="password" id="upstoxApiSecret" placeholder="Upstox API Secret" autocomplete="off"></div>
             <div class="form-group upstox-field hidden"><label for="upstoxAccessToken">Access Token</label><input type="text" id="upstoxAccessToken" placeholder="Paste access token (or click Upstox Login)" autocomplete="off"></div>
+            <!-- Dhan Fields -->
+            <div class="form-group dhan-field hidden"><label for="dhanClientId">Client ID</label><input type="text" id="dhanClientId" placeholder="Dhan Client ID" autocomplete="off"></div>
+            <div class="form-group dhan-field hidden"><label for="dhanAccessToken">Access Token</label><input type="text" id="dhanAccessToken" placeholder="Dhan Access Token" autocomplete="off"></div>
             <div class="button-row" style="align-self:end">
                 <button class="btn btn-primary" onclick="connectAPI()">Connect</button>
                 <button class="btn btn-secondary" onclick="startDemoMode()">Demo</button>
@@ -297,6 +300,7 @@
         </div>
         <p class="helper-text" id="apiLoginError"></p>
         <p class="helper-text upstox-field hidden" style="margin-top:8px;color:#4fd1c5">Upstox: API Key + Secret daalo → "Upstox Login" click karo → Login karo → Token auto-fill ho jayega → Connect dabao.</p>
+        <p class="helper-text dhan-field hidden" style="margin-top:8px;color:#fbbf24">Dhan: <a href="https://dhanhq.co/docs/v2/" target="_blank" style="color:#fbbf24">dhanhq.co</a> pe jao → API Access enable karo → Client ID + Access Token copy karo → Paste karo → Connect. Token daily valid rehta hai.</p>
     </div>
 
     <main class="dashboard" id="dashboard" style="display:none">
@@ -549,7 +553,7 @@
 </div>
 
 <script>function toggleSection(h){var b=h.nextElementSibling,a=h.querySelector('.collapse-arrow');if(b)b.classList.toggle('collapsed');if(a)a.classList.toggle('open');}
-function toggleBrokerFields(){var v=document.getElementById('brokerSelect').value;document.querySelectorAll('.angelone-field').forEach(function(el){if(v==='angelone'){el.classList.remove('hidden');el.style.display='';}else{el.classList.add('hidden');el.style.display='none';}});document.querySelectorAll('.upstox-field').forEach(function(el){if(v==='upstox'){el.classList.remove('hidden');el.style.display='';}else{el.classList.add('hidden');el.style.display='none';}});}
+function toggleBrokerFields(){var v=document.getElementById('brokerSelect').value;document.querySelectorAll('.angelone-field').forEach(function(el){if(v==='angelone'){el.classList.remove('hidden');el.style.display='';}else{el.classList.add('hidden');el.style.display='none';}});document.querySelectorAll('.upstox-field').forEach(function(el){if(v==='upstox'){el.classList.remove('hidden');el.style.display='';}else{el.classList.add('hidden');el.style.display='none';}});document.querySelectorAll('.dhan-field').forEach(function(el){if(v==='dhan'){el.classList.remove('hidden');el.style.display='';}else{el.classList.add('hidden');el.style.display='none';}});}
 function upstoxLogin(){var key=document.getElementById('upstoxApiKey').value.trim();var redirect=window.location.origin+'/callback';if(!key){alert('Pehle Upstox API Key daalo');return;}var url='https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id='+encodeURIComponent(key)+'&redirect_uri='+encodeURIComponent(redirect);window.open(url,'_blank');window.addEventListener('message',function handler(e){if(e.data&&e.data.type==='upstox-code'){window.removeEventListener('message',handler);fetchUpstoxToken(e.data.code);}});}
 async function fetchUpstoxToken(code){var key=document.getElementById('upstoxApiKey').value.trim();var secret=document.getElementById('upstoxApiSecret').value.trim();if(!key||!secret||!code){alert('API Key, Secret aur code chahiye');return;}try{var res=await fetch(window.location.origin+'/api/upstox/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apiKey:key,apiSecret:secret,code:code,redirectUri:window.location.origin+'/callback'})});var data=await res.json();if(data.access_token){document.getElementById('upstoxAccessToken').value=data.access_token;alert('Token mil gaya! Ab Connect dabao.');}else{alert('Token failed: '+(data.error||data.message||'Unknown error'));}}catch(e){alert('Error: '+e.message);}}
 </script>
