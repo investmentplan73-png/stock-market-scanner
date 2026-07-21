@@ -200,7 +200,7 @@ const Config = {
         swing: {
             enabled: true,
             timeframes: ['ONE_HOUR', 'ONE_DAY', 'ONE_WEEK'],
-            minConfidence: 78,
+            minConfidence: 82,
             minTrendStrength: 55,
             minDaysToExpiry: 2,
             maxWarnings: 2,
