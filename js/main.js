@@ -928,10 +928,17 @@ async function updateIndicators() {
     const symbols = Object.keys(Config.indices);
     let successCount = 0;
 
-    for (const symbol of symbols) {
+    // Load only top 6 indices first (NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY, SENSEX, BANKEX)
+    // Sectoral indices use fallback to avoid rate limit
+    const priorityIndices = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'BANKEX'];
+    const indicesToLoad = symbols.filter(s => priorityIndices.includes(s));
+
+    for (const symbol of indicesToLoad) {
+        if (Date.now() < AngelOneAPI.historicalRateLimitedUntil) break;
         if (await updateIndicatorsForSymbol(symbol, Config.indices[symbol], timeframe, getIndexExchange(symbol))) {
             successCount += 1;
         }
+        await new Promise(r => setTimeout(r, 1500)); // 1.5s gap between requests
     }
 
     const scanner = getCurrentScanner();
