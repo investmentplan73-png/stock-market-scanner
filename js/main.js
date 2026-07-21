@@ -2864,6 +2864,8 @@ async function loadOptionsChain(resetExpiry = false) {
 }
 
 async function refreshOptionsForSelectedExpiry(options = {}) {
+    // Skip Angel One option chain when other broker is active
+    if (window._activeBroker === 'upstox' || window._activeBroker === 'dhan') return;
     const force = Boolean(options.force);
     if (isRefreshingOptions) {
         pendingOptionRefresh = true;
