@@ -483,6 +483,149 @@ const TechnicalIndicators = {
         };
     },
 
+    // ==================== PIVOT + CANDLESTICK COMBO TRIGGER (John Person Method) ====================
+    // From "Candlestick and Pivot Point Trading Triggers" by John L. Person
+    // High accuracy: Candlestick pattern at pivot level = confirmed trade trigger
+    calculatePivotCandleCombo: function(opens, highs, lows, closes, pivotData) {
+        if (!pivotData || !pivotData.pivot) return null;
+        const length = Math.min(opens?.length || 0, highs?.length || 0, lows?.length || 0, closes?.length || 0);
+        if (length < 3) return null;
+
+        const currentClose = Number(closes[length - 1]);
+        const currentLow = Number(lows[length - 1]);
+        const currentHigh = Number(highs[length - 1]);
+        if (!this.isNumber(currentClose)) return null;
+
+        const candlePatterns = this.calculateCandlestickPatterns(opens, highs, lows, closes);
+        if (!candlePatterns || !candlePatterns.patterns.length) return null;
+
+        const { pivot, r1, r2, s1, s2 } = pivotData;
+        const range = pivotData.range || (r1 - s1);
+        const tolerance = range * 0.015; // 1.5% of range = "at level"
+
+        // Check which pivot level price is near
+        const levels = [
+            { name: 'S2', value: s2, side: 'BULLISH' },
+            { name: 'S1', value: s1, side: 'BULLISH' },
+            { name: 'Pivot', value: pivot, side: null },
+            { name: 'R1', value: r1, side: 'BEARISH' },
+            { name: 'R2', value: r2, side: 'BEARISH' }
+        ];
+
+        let nearestLevel = null;
+        let nearestDistance = Infinity;
+
+        levels.forEach(level => {
+            if (!this.isNumber(level.value)) return;
+            const dist = Math.abs(currentClose - level.value);
+            if (dist < nearestDistance && dist <= tolerance) {
+                nearestDistance = dist;
+                nearestLevel = level;
+            }
+            // Also check if low touched support or high touched resistance
+            if (level.side === 'BULLISH' && Math.abs(currentLow - level.value) <= tolerance) {
+                if (Math.abs(currentLow - level.value) < nearestDistance) {
+                    nearestDistance = Math.abs(currentLow - level.value);
+                    nearestLevel = level;
+                }
+            }
+            if (level.side === 'BEARISH' && Math.abs(currentHigh - level.value) <= tolerance) {
+                if (Math.abs(currentHigh - level.value) < nearestDistance) {
+                    nearestDistance = Math.abs(currentHigh - level.value);
+                    nearestLevel = level;
+                }
+            }
+        });
+
+        if (!nearestLevel) return { triggered: false, combo: null, boostScore: 0 };
+
+        // Match candlestick direction with pivot level expectation
+        const triggers = [];
+        let boostScore = 0;
+
+        candlePatterns.patterns.forEach(pattern => {
+            // BULLISH pattern at SUPPORT level = BUY trigger
+            if (pattern.direction === 'BULLISH' && nearestLevel.side === 'BULLISH') {
+                const triggerStrength = Math.min(pattern.strength + 15, 98);
+                triggers.push({
+                    type: 'BUY_TRIGGER',
+                    pattern: pattern.name,
+                    level: nearestLevel.name,
+                    levelPrice: nearestLevel.value,
+                    strength: triggerStrength,
+                    detail: `${pattern.name} at ${nearestLevel.name} (${nearestLevel.value.toFixed(2)}) — Strong BUY`
+                });
+                boostScore = Math.max(boostScore, 12);
+            }
+
+            // BEARISH pattern at RESISTANCE level = SELL trigger
+            if (pattern.direction === 'BEARISH' && nearestLevel.side === 'BEARISH') {
+                const triggerStrength = Math.min(pattern.strength + 15, 98);
+                triggers.push({
+                    type: 'SELL_TRIGGER',
+                    pattern: pattern.name,
+                    level: nearestLevel.name,
+                    levelPrice: nearestLevel.value,
+                    strength: triggerStrength,
+                    detail: `${pattern.name} at ${nearestLevel.name} (${nearestLevel.value.toFixed(2)}) — Strong SELL`
+                });
+                boostScore = Math.max(boostScore, 12);
+            }
+
+            // Pattern at PIVOT (neutral level) - direction from pattern
+            if (nearestLevel.name === 'Pivot' && pattern.direction !== 'NEUTRAL') {
+                triggers.push({
+                    type: pattern.direction === 'BULLISH' ? 'BUY_TRIGGER' : 'SELL_TRIGGER',
+                    pattern: pattern.name,
+                    level: 'Pivot',
+                    levelPrice: pivot,
+                    strength: pattern.strength + 8,
+                    detail: `${pattern.name} at Pivot (${pivot.toFixed(2)}) — ${pattern.direction} bias`
+                });
+                boostScore = Math.max(boostScore, 8);
+            }
+
+            // COUNTER signal: Bullish at resistance or Bearish at support = WARNING
+            if (pattern.direction === 'BULLISH' && nearestLevel.side === 'BEARISH') {
+                triggers.push({
+                    type: 'COUNTER_WARNING',
+                    pattern: pattern.name,
+                    level: nearestLevel.name,
+                    levelPrice: nearestLevel.value,
+                    strength: 0,
+                    detail: `${pattern.name} at resistance ${nearestLevel.name} — may fail, resistance overhead`
+                });
+                boostScore = Math.min(boostScore, -5);
+            }
+            if (pattern.direction === 'BEARISH' && nearestLevel.side === 'BULLISH') {
+                triggers.push({
+                    type: 'COUNTER_WARNING',
+                    pattern: pattern.name,
+                    level: nearestLevel.name,
+                    levelPrice: nearestLevel.value,
+                    strength: 0,
+                    detail: `${pattern.name} at support ${nearestLevel.name} — may fail, support below`
+                });
+                boostScore = Math.min(boostScore, -5);
+            }
+        });
+
+        const bestTrigger = triggers
+            .filter(t => t.type !== 'COUNTER_WARNING')
+            .sort((a, b) => b.strength - a.strength)[0] || null;
+        const warnings = triggers.filter(t => t.type === 'COUNTER_WARNING');
+
+        return {
+            triggered: Boolean(bestTrigger),
+            combo: bestTrigger,
+            warnings: warnings.slice(0, 2),
+            allTriggers: triggers.slice(0, 5),
+            nearestLevel,
+            boostScore,
+            direction: bestTrigger ? (bestTrigger.type === 'BUY_TRIGGER' ? 'BULLISH' : 'BEARISH') : 'NEUTRAL'
+        };
+    },
+
     calculateFibonacciContext: function(highs, lows, closes, lookback = 55) {
         const length = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0);
         if (length < 10) return null;

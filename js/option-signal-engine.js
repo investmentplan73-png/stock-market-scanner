@@ -612,6 +612,23 @@ const OptionSignalEngine = {
             warnings.push((candlestick.primary?.name || 'Candlestick pattern') + ' is against trade');
         }
 
+        // PIVOT + CANDLESTICK COMBO TRIGGER (John Person Method)
+        const pivotCombo = indicators.PivotCandleCombo || {};
+        if (pivotCombo.triggered && pivotCombo.combo) {
+            const comboDirection = pivotCombo.direction;
+            if (comboDirection === wantedDirection) {
+                score += pivotCombo.boostScore || 12;
+                confirmed = true;
+                reasons.push(pivotCombo.combo.detail || 'Pivot+Candle combo confirms');
+            } else if (comboDirection === oppositeDirection) {
+                score -= 10;
+                warnings.push(pivotCombo.combo.detail || 'Pivot+Candle combo is against trade');
+            }
+        }
+        if (pivotCombo.warnings && pivotCombo.warnings.length) {
+            pivotCombo.warnings.forEach(w => warnings.push(w.detail || 'Pivot counter signal'));
+        }
+
         if (fibonacci.direction === wantedDirection && Number(fibonacci.strength || 0) >= 45) {
             score += fibonacci.inGoldenZone ? 14 : 9;
             confirmed = true;

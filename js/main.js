@@ -1137,6 +1137,7 @@ function calculateIndicatorsFromCandles(candles) {
         ICTAdvancedContext: calculateAdvancedIctContext(candles),
         ORBGapBBContext: calculateOrbGapBbContext(candles, { bollingerBands, vwap }),
         PivotPoints: TechnicalIndicators.calculatePivotPoints(highs, lows, closes),
+        PivotCandleCombo: TechnicalIndicators.calculatePivotCandleCombo(opens, highs, lows, closes, TechnicalIndicators.calculatePivotPoints(highs, lows, closes)),
         SupportResistance: TechnicalIndicators.calculateSupportResistance(
             highs,
             lows,
