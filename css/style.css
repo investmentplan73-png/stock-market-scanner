@@ -529,12 +529,12 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; back
 .breadth-popup-item.bp-down .bp-change { color: #fc8181; }
 
 /* ==================== P&L CARDS ==================== */
-.pnl-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 18px; }
-.pnl-card { background: linear-gradient(145deg, #111827, #0d1221); border: 1px solid rgba(99, 179, 237, 0.06); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; }
+.pnl-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.pnl-card { background: linear-gradient(145deg, #111827, #0d1221); border: 1px solid rgba(99, 179, 237, 0.06); border-radius: 12px; padding: 14px 16px; position: relative; overflow: hidden; }
 .pnl-card::after { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: linear-gradient(180deg, #63b3ed, #4fd1c5); border-radius: 3px; }
-.pnl-card-header { font-size: 11px; color: #6b7b8f; text-transform: uppercase; font-weight: 700; margin-bottom: 14px; letter-spacing: 1.2px; }
-.pnl-card-main { font-size: 34px; font-weight: 800; margin-bottom: 14px; }
-.pnl-card-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; border-top: 1px solid rgba(99, 179, 237, 0.06); }
+.pnl-card-header { font-size: 10px; color: #6b7b8f; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; letter-spacing: 1px; }
+.pnl-card-main { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+.pnl-card-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; border-top: 1px solid rgba(99, 179, 237, 0.04); }
 .pnl-card-label { color: #6b7b8f; }
 .pnl-card-value { font-weight: 600; color: #e8eaf6; }
 
