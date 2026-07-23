@@ -5675,9 +5675,9 @@ function createOptionSignalCard(signal) {
         .slice(0, 3);
 
     card.innerHTML = `
-        <h4>${escapeHtml(signal.action)} ${escapeHtml(signal.symbol)} ${escapeHtml(signal.strike)} ${escapeHtml(signal.side)}</h4>
+        <h4>${escapeHtml(signal.action)} ${escapeHtml(signal.symbol)} ${escapeHtml(signal.strike)} ${escapeHtml(signal.side)} <span style="font-size:9px;padding:2px 6px;border-radius:4px;margin-left:6px;background:${signal.segment === 'COMMODITY' ? 'rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3)' : signal.segment === 'STOCK' ? 'rgba(99,179,237,0.15);color:#63b3ed;border:1px solid rgba(99,179,237,0.3)' : 'rgba(104,211,145,0.15);color:#68d391;border:1px solid rgba(104,211,145,0.3)'}">${escapeHtml(signal.segment || 'INDEX')}</span></h4>
         <div class="signal-details">
-            ${escapeHtml(signal.expiryDate || '--')} | Score: ${Number(signal.score || 0)}% | LTP: <span data-live-signal-ltp>${OptionSignalEngine.formatMoney(getLiveOptionLtp(signal.option))}</span><br>
+            ${escapeHtml(signal.expiryDate || '--')} | Score: ${Number(signal.score || 0)}% (${signal.confirmCount || '?'} confirms) | LTP: <span data-live-signal-ltp>${OptionSignalEngine.formatMoney(getLiveOptionLtp(signal.option))}</span><br>
             SL: ${OptionSignalEngine.formatMoney(risk.stopLoss)} | T1: ${OptionSignalEngine.formatMoney(risk.target1)} | T2: ${OptionSignalEngine.formatMoney(risk.target2)} | Lot: ${escapeHtml(formatOptionLotSize(signal))}${!isTrade && blockers.length ? `<br><span style="color:#fbbf24;font-size:10px">${escapeHtml(blockers.join(' | '))}</span>` : ''}
         </div>
     `;

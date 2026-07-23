@@ -978,6 +978,7 @@ const OptionSignalEngine = {
             action,
             score,
             confidence: score,
+            confirmCount,
             option,
             risk,
             bias,
