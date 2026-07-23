@@ -728,13 +728,14 @@ const OptionSignalEngine = {
         }
 
         if (bias.direction === wantedDirection) {
-            score += Math.min(bias.strength, 45);
-            reasons.push(...bias.reasons.slice(0, 4));
+            score += Math.min(bias.strength, 20);
+            reasons.push(...bias.reasons.slice(0, 3));
         } else if (bias.direction === 'NEUTRAL') {
             warnings.push('Underlying trend is neutral');
+            score -= 5;
         } else {
             warnings.push(`Underlying trend is ${bias.direction}`);
-            score -= 20;
+            score -= 30;
         }
 
         if (ictConfirmed) {
@@ -951,7 +952,13 @@ const OptionSignalEngine = {
         } else if (score >= settings.strongConfidence && warnings.length <= Number(settings.maxBuyWarnings ?? 1) && buyAllowed) {
             action = `BUY ${side}`;
         } else if (score >= Number(settings.minBuyScore || 76) && warnings.length <= Number(settings.maxBuyWarnings ?? 2) && buyAllowed && (trendConfirmed || ictAligned)) {
-            action = `BUY ${side}`;
+            // Require at least indicator confirmation beyond just trend
+            if (confirmed || ictAligned) {
+                action = `BUY ${side}`;
+            } else {
+                action = `WATCH ${side}`;
+                warnings.push('Trend aligned but indicator confirmation incomplete');
+            }
         } else if (score >= settings.minConfidence && warnings.length <= Number(settings.maxWatchWarnings ?? 2) && qualityCheck.watchOk) {
             action = `WATCH ${side}`;
         }

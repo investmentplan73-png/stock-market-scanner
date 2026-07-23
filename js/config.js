@@ -166,12 +166,12 @@ const Config = {
         maxWatchWarnings: 3,
         minRewardRiskForBuy: 1.8,
         stopLoss: {
-            confirmations: 2, // FIX: Was 1, now 2 - need 2 touches to confirm SL
-            fallbackRiskPercent: 28, // FIX: Was 24, wider buffer
-            minRiskPercent: 18, // FIX: Was 14, wider minimum
-            optionSupportBufferPercent: 6, // FIX: Was 4, wider buffer
-            supportBufferPercent: 0.12, // FIX: Was 0.08, wider buffer
-            atrBufferMultiplier: 0.18 // FIX: Was 0.12, wider ATR buffer
+            confirmations: 2,
+            fallbackRiskPercent: 34, // Wider for commodity
+            minRiskPercent: 24, // Wider minimum to avoid premature SL
+            optionSupportBufferPercent: 9, // More room for volatility
+            supportBufferPercent: 0.18, // Wider support buffer
+            atrBufferMultiplier: 0.25 // More ATR buffer for volatile moves
         },
         breakout: {
             enabled: true,
