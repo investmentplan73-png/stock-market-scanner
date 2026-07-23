@@ -1075,6 +1075,7 @@ const OptionSignalEngine = {
             action: 'NO TRADE',
             score,
             confidence: score,
+            confirmCount: 0,
             option,
             risk: this.createRiskPlan(option.ltp || 0),
             bias: { direction: 'NEUTRAL', strength: 0, reasons: [] },
