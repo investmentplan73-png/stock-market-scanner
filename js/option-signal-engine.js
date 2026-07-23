@@ -558,11 +558,13 @@ const OptionSignalEngine = {
         const chartPattern = indicators.ChartPatterns || {};
         const pivot = indicators.PivotPoints || {};
         let confirmed = false;
+        let confirmCount = 0;
         let blocked = false;
 
         if (advancedRsi.direction === wantedDirection) {
             score += advancedRsi.signal === (wantsBullish ? 'BUY' : 'SELL') ? 16 : 9;
             confirmed = true;
+            confirmCount++;
             reasons.push(`Advanced RSI ${advancedRsi.zone || ''} confirms ${side}`.trim());
         } else if (advancedRsi.direction === oppositeDirection) {
             score -= 16;
@@ -571,8 +573,9 @@ const OptionSignalEngine = {
         }
 
         if (obv.direction === wantedDirection) {
-            score += 10;
+            score += 12;
             confirmed = true;
+            confirmCount++;
             reasons.push('OBV volume pressure confirms');
         } else if (obv.direction === oppositeDirection) {
             score -= 12;
@@ -603,11 +606,12 @@ const OptionSignalEngine = {
         }
 
         if (candlestick.direction === wantedDirection && Number(candlestick.strength || 0) >= 58) {
-            score += candlestick.strength >= 80 ? 16 : 10;
+            score += candlestick.strength >= 80 ? 18 : 12;
             confirmed = true;
+            confirmCount++;
             reasons.push((candlestick.primary?.name || 'Candlestick pattern') + ' confirms ' + side);
         } else if (candlestick.direction === oppositeDirection && Number(candlestick.strength || 0) >= 58) {
-            score -= candlestick.strength >= 80 ? 18 : 12;
+            score -= candlestick.strength >= 80 ? 20 : 14;
             blocked = Number(candlestick.strength || 0) >= 80 || blocked;
             warnings.push((candlestick.primary?.name || 'Candlestick pattern') + ' is against trade');
         }
@@ -617,11 +621,12 @@ const OptionSignalEngine = {
         if (pivotCombo.triggered && pivotCombo.combo) {
             const comboDirection = pivotCombo.direction;
             if (comboDirection === wantedDirection) {
-                score += pivotCombo.boostScore || 12;
+                score += pivotCombo.boostScore || 14;
                 confirmed = true;
+                confirmCount++;
                 reasons.push(pivotCombo.combo.detail || 'Pivot+Candle combo confirms');
             } else if (comboDirection === oppositeDirection) {
-                score -= 10;
+                score -= 12;
                 warnings.push(pivotCombo.combo.detail || 'Pivot+Candle combo is against trade');
             }
         }
@@ -630,20 +635,22 @@ const OptionSignalEngine = {
         }
 
         if (fibonacci.direction === wantedDirection && Number(fibonacci.strength || 0) >= 45) {
-            score += fibonacci.inGoldenZone ? 14 : 9;
+            score += fibonacci.inGoldenZone ? 16 : 10;
             confirmed = true;
+            confirmCount++;
             reasons.push(fibonacci.inGoldenZone ? 'Fibonacci golden zone confirms' : 'Fibonacci level confirms');
         } else if (fibonacci.direction === oppositeDirection && Number(fibonacci.strength || 0) >= 45) {
-            score -= fibonacci.inGoldenZone ? 16 : 10;
+            score -= fibonacci.inGoldenZone ? 18 : 12;
             warnings.push('Fibonacci zone is against trade');
         }
 
         if (chartPattern.direction === wantedDirection && Number(chartPattern.strength || 0) >= 58) {
-            score += chartPattern.strength >= 80 ? 18 : 12;
+            score += chartPattern.strength >= 80 ? 20 : 14;
             confirmed = true;
+            confirmCount++;
             reasons.push((chartPattern.primary?.name || 'Chart pattern') + ' confirms');
         } else if (chartPattern.direction === oppositeDirection && Number(chartPattern.strength || 0) >= 58) {
-            score -= chartPattern.strength >= 80 ? 20 : 12;
+            score -= chartPattern.strength >= 80 ? 22 : 14;
             blocked = Number(chartPattern.strength || 0) >= 80 || blocked;
             warnings.push((chartPattern.primary?.name || 'Chart pattern') + ' is against trade');
         }
@@ -651,11 +658,12 @@ const OptionSignalEngine = {
         if (pivot && TechnicalIndicators.isNumber(pivot.currentPrice) && TechnicalIndicators.isNumber(pivot.pivot)) {
             const pivotAligned = wantsBullish ? pivot.currentPrice > pivot.pivot : pivot.currentPrice < pivot.pivot;
             if (pivotAligned) {
-                score += 6;
+                score += 8;
                 confirmed = true;
+                confirmCount++;
                 reasons.push(wantsBullish ? 'Price above pivot' : 'Price below pivot');
             } else {
-                score -= 9;
+                score -= 12;
                 warnings.push(wantsBullish ? 'Price below pivot' : 'Price above pivot');
             }
         }
@@ -949,15 +957,15 @@ const OptionSignalEngine = {
         } else if (btstAllowed) {
             action = `BTST ${side}`;
             reasons.unshift('BTST setup for next session holding');
-        } else if (score >= settings.strongConfidence && warnings.length <= Number(settings.maxBuyWarnings ?? 1) && buyAllowed && confirmed) {
+        } else if (score >= settings.strongConfidence && warnings.length <= Number(settings.maxBuyWarnings ?? 1) && buyAllowed && confirmed && confirmCount >= 3) {
             action = `BUY ${side}`;
         } else if (score >= Number(settings.minBuyScore || 76) && warnings.length <= Number(settings.maxBuyWarnings ?? 2) && buyAllowed && (trendConfirmed || ictAligned)) {
             // BUY ONLY when indicators have confirmed - not just trend
-            if (confirmed) {
+            if (confirmed && confirmCount >= 3) {
                 action = `BUY ${side}`;
             } else {
                 action = `WATCH ${side}`;
-                warnings.push('Indicators not fully confirmed yet');
+                warnings.push(`Only ${confirmCount} indicators confirmed, need 3+`);
             }
         } else if (score >= settings.minConfidence && warnings.length <= Number(settings.maxWatchWarnings ?? 2) && qualityCheck.watchOk) {
             action = `WATCH ${side}`;
