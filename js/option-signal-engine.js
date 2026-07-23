@@ -688,7 +688,7 @@ const OptionSignalEngine = {
             }
         }
 
-        return { score, confirmed, blocked };
+        return { score, confirmed, blocked, confirmCount };
     },
 
     evaluateOption: function(context) {
@@ -798,6 +798,7 @@ const OptionSignalEngine = {
             safeIndicators
         );
         score = transcriptFormulaCheck.score;
+        const confirmCount = transcriptFormulaCheck.confirmCount || 0;
 
         if (option.change > 0 || option.changePercent > 0) {
             score += 12;
