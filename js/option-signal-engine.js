@@ -957,15 +957,15 @@ const OptionSignalEngine = {
         } else if (btstAllowed) {
             action = `BTST ${side}`;
             reasons.unshift('BTST setup for next session holding');
-        } else if (score >= settings.strongConfidence && warnings.length <= Number(settings.maxBuyWarnings ?? 1) && buyAllowed && confirmed && confirmCount >= 3) {
+        } else if (score >= settings.strongConfidence && warnings.length <= Number(settings.maxBuyWarnings ?? 1) && buyAllowed && confirmed && (confirmCount || 0) >= 3) {
             action = `BUY ${side}`;
         } else if (score >= Number(settings.minBuyScore || 76) && warnings.length <= Number(settings.maxBuyWarnings ?? 2) && buyAllowed && (trendConfirmed || ictAligned)) {
             // BUY ONLY when indicators have confirmed - not just trend
-            if (confirmed && confirmCount >= 3) {
+            if (confirmed && (confirmCount || 0) >= 3) {
                 action = `BUY ${side}`;
             } else {
                 action = `WATCH ${side}`;
-                warnings.push(`Only ${confirmCount} indicators confirmed, need 3+`);
+                warnings.push(`Only ${confirmCount || 0} indicators confirmed, need 3+`);
             }
         } else if (score >= settings.minConfidence && warnings.length <= Number(settings.maxWatchWarnings ?? 2) && qualityCheck.watchOk) {
             action = `WATCH ${side}`;
