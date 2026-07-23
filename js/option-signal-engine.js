@@ -799,6 +799,7 @@ const OptionSignalEngine = {
         );
         score = transcriptFormulaCheck.score;
         const confirmCount = transcriptFormulaCheck.confirmCount || 0;
+        const confirmed = transcriptFormulaCheck.confirmed || false;
 
         if (option.change > 0 || option.changePercent > 0) {
             score += 12;
